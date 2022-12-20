@@ -16,17 +16,17 @@ learnDTR(
 }
 \arguments{
 \item{X}{A list of information available at each stage in order, that is, \code{X[[1]]} represents the baseline information,
-and \code{X[[t]]} is the information observed before \eqn{t^th} intervention.
+and \code{X[[t]]} is the information observed before \eqn{t^{th}} intervention.
 The dimensionality of each element \code{X[[i]]} can be different from each other.
 Notably, it can includes previous stages' action information \code{A} and outcome/reward information
 \code{Y}. User can flexibly manipulate which covariates to use in training.
 However, if argument \code{all.inclusive} is \code{TRUE}, all previous stages' \code{X}, \code{A},
-and \code{Y} will be used in training. So, in that case, \code{X} shiould not involve action and reward
+and \code{Y} will be used in training. So, in that case, \code{X} should not involve action and reward
 information.}
 
-\item{A}{A list of actions taken during the sequantial studies. The order should match with that of \code{X}}
+\item{A}{A list of actions taken during the sequential studies. The order should match with that of \code{X}}
 
-\item{Y}{A list of outcomes observed in the sequantial studies. The order should match with that of \code{X}.
+\item{Y}{A list of outcomes observed in the sequential studies. The order should match with that of \code{X}.
 \code{Y[[t]]} is suppose to be driven by the \code{X[[t]]} and action \code{A[[t]]}.}
 
 \item{weights}{Weights on each stage of rewards. Default is all 1.}

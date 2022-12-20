@@ -79,7 +79,7 @@ recommendDTR <- function(DTRs, X.new,
           A.new <- A.opt.S
         }
       }
-      names(A.opt.S) <- paste("Stage", seq(n.step, by = 1), sep = ".")
+      names(A.opt.S) <- paste("Stage", seq(start, n.step, by = 1), sep = ".")
     }
 
     ######============  T-learner  ============
@@ -119,7 +119,7 @@ recommendDTR <- function(DTRs, X.new,
           A.new <- A.opt.T
         }
       }
-      names(A.opt.T) <- paste("Stage", seq(n.step, by = 1), sep = ".")
+      names(A.opt.T) <- paste("Stage", seq(start, n.step, by = 1), sep = ".")
     }
   }
 
