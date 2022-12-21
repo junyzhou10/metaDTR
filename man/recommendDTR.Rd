@@ -4,10 +4,13 @@
 \alias{recommendDTR}
 \title{Recommend the optimal treatment at each stage}
 \usage{
-recommendDTR(DTRs, X.new, A.new = NULL, Y.new = NULL, start = 1)
+recommendDTR(DTRs, currentDTRs = NULL, X.new, A.new = NULL, Y.new = NULL)
 }
 \arguments{
 \item{DTRs}{Output from \code{\link[=learnDTR]{learnDTR()}} that belong to class \code{metaDTR}.}
+
+\item{currentDTRs}{Object from \code{\link[=recommendDTR]{recommendDTR()}}. Records the results from previous stages so that users can
+flexibly make predictions stage by stage. See details and example.}
 
 \item{X.new}{A list of covariates at each stage. In practice, since recommendations are made
 stage by stage, here one stage of \code{X.new} will provide one stage's recommendation of action.}
@@ -19,10 +22,6 @@ with algorithm results. Only needed when \code{all.inclusive = TRUE}.
 Default is \code{NULL}.}
 
 \item{Y.new}{A list. Only required if \code{all.inclusive = TRUE} in \code{\link[=learnDTR]{learnDTR()}}. Default is \code{NULL}}
-
-\item{start}{It allows predictions to start from middle stages (to save time),
-in which case \code{A.new} and \code{Y.new}
-should be properly provided if \code{all.inclusive = TRUE}.}
 }
 \value{
 It returns the optimal action/treatment recommendations at each stage and results are stored in a list for
@@ -33,6 +32,10 @@ This function make recommendations of optimal treatment for a given subject at g
 }
 \details{
 This function make recommendations based on the trained learners from \code{\link[=learnDTR]{learnDTR()}} for new dataset.
+Since in real application, later stage covariates/outcomes are unobservable until treatments are
+assigned. So in most cases, \code{\link[=recommendDTR]{recommendDTR()}} needs to be applied stage by stage, which is allowed in
+this package. User can provide available information at any stage and obtain the optimal recommendations
+at that stage.
 }
 \seealso{
 \code{\link{learnDTR}}
