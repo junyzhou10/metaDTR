@@ -37,6 +37,10 @@ assigned. So in most cases, \code{\link[=recommendDTR]{recommendDTR()}} needs to
 this package. User can provide available information at any stage and obtain the optimal recommendations
 at that stage.
 }
+\examples{
+## To see details of applying this function to obtain optimal DTR on new dataset, please
+##   refer to author's post: https://jzhou.org/posts/optdtr/
+}
 \seealso{
 \code{\link{learnDTR}}
 }

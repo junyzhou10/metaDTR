@@ -19,7 +19,13 @@
 #' @param metaLearners Meta-learner algorithms to learn the optimal DTR. To support more than two actions
 #'                     at each stage, S-, A-, and deC-learner are available. But deC-learner only works when
 #'                     \code{baseLearner = "GAM"} so far.
-#' @param all.inclusive If \code{TRUE}, covariates adopted in training at stage \code{T} includes
+#' @param include.X 0 for no past X included in analysis; 1 for all past X included
+#' @param include.A 0 for no past treatment assignment included in analysis; 1 for only last A included; 2 for all past
+#'                  A included
+#' @param include.Y 0 for no past reward/outcome Y included in analysis; 1 for only last Y included; 2 for all past
+#'                  Y included
+#' @param verbose Console print allowed?
+#' If \code{TRUE}, covariates adopted in training at stage \code{T} includes
 #'                      \code{X[[t]], t<=T}, \code{A[[t]], t<T}, and \code{Y[[t]], t<T}. In other words,
 #'                      \code{X} actually should only store additional covariates at each stage. Note that if
 #'                      there are subjects dropping out during the study, it will cause error.
@@ -31,6 +37,20 @@
 #'         sequential recommendations might require intermediate observations, [learnDTR()] will not automatically
 #'         provide prediction. But by another function [recommendDTR],
 #'         predictions can flexibly been made stage by stage.
+#' @examples
+#' ## this is the sample adopted in:
+#' ## https://jzhou.org/posts/optdtr/#case-1-random-assignment-with-two-treatment-options
+#' \dontrun{
+#' DTRs = learnDTR(X = TwoStg_Dat$X,
+#'                 A = TwoStg_Dat$A,
+#'                 Y = TwoStg_Dat$Y,
+#'                 weights = rep(1, length(X)),
+#'                 baseLearner  = c("BART"),
+#'                 metaLearners = c("S", "T"),
+#'                 include.X = 1,
+#'                 include.A = 2,
+#'                 include.Y = 0)
+#' }
 #' @import stats utils dbarts glmnet
 #' @export
 #' @seealso \code{\link{recommendDTR}}
@@ -38,7 +58,8 @@
 learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
                      baseLearner  = c("BART", "GAM"),
                      metaLearners = c("S", "T", "deC"),
-                     all.inclusive = FALSE
+                     include.X = 0, include.A = 0, include.Y = 0,
+                     verbose = TRUE
 ) {
   n.stage = length(X)
   ######==================== check inputs ====================
@@ -59,22 +80,38 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
       V.est = 0; S.learners = list()
       for (stage in seq(n.stage, by = -1)) {
         n.train = nrow(X[[stage]])
-        if (all.inclusive) {
-          if (stage > 1) {
-            X.tr = data.frame(A = matrix(unlist(A[1:(stage-1)]), ncol = stage-1, byrow = FALSE), # A
-                              X = matrix(unlist(X[1:stage]), nrow = n.train, byrow = FALSE),     # X
-                              Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE)  # Y
-            )
-            for (ii in seq(stage-1)) {
-              X.tr[,ii] <- as.factor(X.tr[,ii])
-            }
-          } else {
-            X.tr = X[[stage]]
-          }
-
+        ## construct training dataset
+        if (stage == 1) {
+          X.tr = data.frame(X = X[[stage]])
         } else {
-          X.tr = X[[stage]]
+          ## note the sequence of X, A, Y
+          if (include.X == 1) {
+            X.tr = data.frame(X = matrix(unlist(X[1:stage]), nrow = n.train, byrow = FALSE))
+          } else {
+            X.tr = data.frame(X = X[[stage]])
+          }
+          if (include.A == 1) { # nothing need to do when include.A == 0
+            A.tmp = data.frame(A = A[[stage-1]])
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.tr = cbind(X.tr, A.tmp)
+          } else if (include.A == 2) {
+            A.tmp = data.frame(A = matrix(unlist(A[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.tr = cbind(X.tr, A.tmp)
+          }
+          if (include.Y == 1) { # nothing need to do when include.Y == 0
+            Y.tmp = data.frame(Y = Y[[stage-1]])
+            X.tr = cbind(X.tr, Y.tmp)
+          } else if (include.Y == 2) {
+            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            X.tr = cbind(X.tr, Y.tmp)
+          }
         }
+
         A.tr = A[[stage]]
         Y.tr = Y[[stage]]
         K.grp = sort(unique(A.tr))
@@ -99,27 +136,46 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         S.learners = c(S.learners, list(S.fit))
       }
       names(S.learners) <- paste("S", seq(n.stage, by = -1), sep = ".")
+      if (verbose) {
+        print("S-learner traning done!!")
+      }
     }
 
     ######============  T-learner  ============
     if ("T" %in% metaLearners) {
       V.est = 0; T.learners = list()
       for (stage in seq(n.stage, by = -1)) {
-        if (all.inclusive) {
-          if (stage > 1) {
-            X.tr = data.frame(A = matrix(unlist(A[1:(stage-1)]), ncol = stage-1, byrow = FALSE), # A
-                              X = matrix(unlist(X[1:stage]), nrow = n.train, byrow = FALSE),     # X
-                              Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE)  # Y
-            )
-            for (ii in seq(stage-1)) {
-              X.tr[,ii] <- as.factor(X.tr[,ii])
-            }
-          } else {
-            X.tr = X[[stage]]
-          }
-
+        n.train = nrow(X[[stage]])
+        ## construct training dataset
+        if (stage == 1) {
+          X.tr = data.frame(X = X[[stage]])
         } else {
-          X.tr = X[[stage]]
+          ## note the sequence of X, A, Y
+          if (include.X == 1) {
+            X.tr = data.frame(X = matrix(unlist(X[1:stage]), nrow = n.train, byrow = FALSE))
+          } else {
+            X.tr = data.frame(X = X[[stage]])
+          }
+          if (include.A == 1) { # nothing need to do when include.A == 0
+            A.tmp = data.frame(A = A[[stage-1]])
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.tr = cbind(X.tr, A.tmp)
+          } else if (include.A == 2) {
+            A.tmp = data.frame(A = matrix(unlist(A[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.tr = cbind(X.tr, A.tmp)
+          }
+          if (include.Y == 1) { # nothing need to do when include.Y == 0
+            Y.tmp = data.frame(Y = Y[[stage-1]])
+            X.tr = cbind(X.tr, Y.tmp)
+          } else if (include.Y == 2) {
+            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            X.tr = cbind(X.tr, Y.tmp)
+          }
         }
         A.tr = A[[stage]]
         Y.tr = Y[[stage]]
@@ -142,6 +198,9 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         T.learners = c(T.learners, list(T.stage))
       }
       names(T.learners) <- paste("T", seq(n.stage, by = -1), sep = ".")
+      if (verbose) {
+        print("T-learner traning done!!")
+      }
     }
   }
 
@@ -161,7 +220,9 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
                    A.list  = A.list,
                    baseLearner   = baseLearner,
                    metaLearners  = metaLearners,
-                   all.inclusive = all.inclusive
+                   include.X = include.X,
+                   include.Y = include.Y,
+                   include.A = include.A
                  )
   )
   class(DTRres) <- "metaDTR"

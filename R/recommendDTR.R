@@ -20,6 +20,9 @@
 #'
 #' @return It returns the optimal action/treatment recommendations at each stage and results are stored in a list for
 #'         each meta-learner method.
+#' @examples
+#' ## To see details of applying this function to obtain optimal DTR on new dataset, please
+#' ##   refer to author's post: https://jzhou.org/posts/optdtr/
 #' @export
 #' @seealso \code{\link{learnDTR}}
 
@@ -30,6 +33,9 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
   baseLearner <- DTRs$controls$baseLearner
   metaLearners <- DTRs$controls$metaLearners
   A.list <- DTRs$controls$A.list
+  include.X <- DTRs$controls$include.X
+  include.Y <- DTRs$controls$include.Y
+  include.A <- DTRs$controls$include.A
 
   ######==================== check/arrange inputs ====================
   if (is.null(currentDTRs)) {
@@ -73,29 +79,42 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
     if ("S" %in% metaLearners) {
       for (stage in seq(start, n.step, by = 1)) { # forward now
         n.test = nrow(X.new[[stage]])
-        if (all.inclusive) {
-          if (stage > 1) {
-            if (is.null(Y.new)) {
-              stop("Missing Y.new given all.inclusive == TRUE! \n")
-            }
-            ## check if override is triggerred
-            A.new <- currentDTRs$A.opt.S
-            A.new[A.ind] <- A.obs[A.ind]
 
-            X.te = data.frame(A = matrix(unlist(A.new[1:(stage-1)]), nrow = n.test, byrow = FALSE), # A
-                              X = matrix(unlist(X.new[1:stage]), nrow = n.test, byrow = FALSE),     # X
-                              Y = matrix(unlist(Y.new[1:(stage-1)]), nrow = n.test, byrow = FALSE)  # Y
-            )
-            for (ii in seq(stage-1)) {
-              X.te[,ii] <- as.factor(X.te[,ii])
-            }
-          } else {
-            X.te = X.new[[stage]]
-          }
-
+        ## retrieve training dataset structures
+        if (stage == 1) {
+          X.te = data.frame(X = X.new[[stage]])
         } else {
-          X.te = X.new[[stage]]
+          ## follow the sequence of X, A, Y
+          if (include.X == 1) {
+            X.te = data.frame(X = matrix(unlist(X.new[1:stage]), nrow = n.test, byrow = FALSE))
+          } else {
+            X.te = data.frame(X = X.new[[stage]])
+          }
+          ## override is triggered
+          A.new <- A.opt.S
+          A.new[A.ind] <- A.obs[A.ind]
+          if (include.A == 1) { # nothing need to do when include.A == 0
+            A.tmp = data.frame(A = A.new[[stage-1]])
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.te = cbind(X.te, A.tmp)
+          } else if (include.A == 2) {
+            A.tmp = data.frame(A = matrix(unlist(A.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.te = cbind(X.te, A.tmp)
+          }
+          if (include.Y == 1) { # nothing need to do when include.Y == 0
+            Y.tmp = data.frame(Y = Y.new[[stage-1]])
+            X.te = cbind(X.te, Y.tmp)
+          } else if (include.Y == 2) {
+            Y.tmp = data.frame(Y = matrix(unlist(Y.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
+            X.te = cbind(X.te, Y.tmp)
+          }
         }
+
         ## predict outcome based on trained learners:
         Y.pred <- dat.tmp <- NULL
         for (ii in A.list[[stage]]) {
@@ -115,28 +134,42 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
     if ("T" %in% metaLearners) {
       for (stage in seq(start, n.step, by = 1)) {
         n.test = nrow(X.new[[stage]])
-        if (all.inclusive) {
-          if (stage > 1) {
-            if (is.null(Y.new)) {
-              stop("Missing Y.new given all.inclusive == TRUE! \n")
-            }
-            ## check if override is triggerred
-            A.new <- currentDTRs$A.opt.T
-            A.new[A.ind] <- A.obs[A.ind]
-            X.te = data.frame(A = matrix(unlist(A.new[1:(stage-1)]), nrow = n.test, byrow = FALSE), # A
-                              X = matrix(unlist(X.new[1:stage]), nrow = n.test, byrow = FALSE),     # X
-                              Y = matrix(unlist(Y.new[1:(stage-1)]), nrow = n.test, byrow = FALSE)  # Y
-            )
-            for (ii in seq(stage-1)) {
-              X.te[,ii] <- as.factor(X.te[,ii])
-            }
-          } else {
-            X.te = X.new[[stage]]
-          }
 
+        ## retrieve training dataset structures
+        if (stage == 1) {
+          X.te = data.frame(X = X.new[[stage]])
         } else {
-          X.te = X.new[[stage]]
+          ## follow the sequence of X, A, Y
+          if (include.X == 1) {
+            X.te = data.frame(X = matrix(unlist(X.new[1:stage]), nrow = n.test, byrow = FALSE))
+          } else {
+            X.te = data.frame(X = X.new[[stage]])
+          }
+          ## override is triggered
+          A.new <- A.opt.T
+          A.new[A.ind] <- A.obs[A.ind]
+          if (include.A == 1) { # nothing need to do when include.A == 0
+            A.tmp = data.frame(A = A.new[[stage-1]])
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.te = cbind(X.te, A.tmp)
+          } else if (include.A == 2) {
+            A.tmp = data.frame(A = matrix(unlist(A.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.te = cbind(X.te, A.tmp)
+          }
+          if (include.Y == 1) { # nothing need to do when include.Y == 0
+            Y.tmp = data.frame(Y = Y.new[[stage-1]])
+            X.te = cbind(X.te, Y.tmp)
+          } else if (include.Y == 2) {
+            Y.tmp = data.frame(Y = matrix(unlist(Y.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
+            X.te = cbind(X.te, Y.tmp)
+          }
         }
+
         ## predict outcome based on trained learners:
         Y.pred <- NULL
         for (ii in seq(length(A.list[[stage]]))) {

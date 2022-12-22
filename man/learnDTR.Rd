@@ -11,7 +11,10 @@ learnDTR(
   weights = rep(1, length(X)),
   baseLearner = c("BART", "GAM"),
   metaLearners = c("S", "T", "deC"),
-  all.inclusive = FALSE
+  include.X = 0,
+  include.A = 0,
+  include.Y = 0,
+  verbose = TRUE
 )
 }
 \arguments{
@@ -38,7 +41,16 @@ information.}
 at each stage, S-, A-, and deC-learner are available. But deC-learner only works when
 \code{baseLearner = "GAM"} so far.}
 
-\item{all.inclusive}{If \code{TRUE}, covariates adopted in training at stage \code{T} includes
+\item{include.X}{0 for no past X included in analysis; 1 for all past X included}
+
+\item{include.A}{0 for no past treatment assignment included in analysis; 1 for only last A included; 2 for all past
+A included}
+
+\item{include.Y}{0 for no past reward/outcome Y included in analysis; 1 for only last Y included; 2 for all past
+Y included}
+
+\item{verbose}{Console print allowed?
+If \code{TRUE}, covariates adopted in training at stage \code{T} includes
 \code{X[[t]], t<=T}, \code{A[[t]], t<T}, and \code{Y[[t]], t<T}. In other words,
 \code{X} actually should only store additional covariates at each stage. Note that if
 there are subjects dropping out during the study, it will cause error.}
@@ -57,6 +69,21 @@ or observational ones. Multiple treatment options are supported.
 This function supports to find the optimal dynamic treatment regime (DTR) for either randomized experiments
 or observational studies. Also, thanks to meta-learner structure, S-, T-, and deC-learner can naturally
 support multiple action options at any stage.
+}
+\examples{
+## this is the sample adopted in:
+## https://jzhou.org/posts/optdtr/#case-1-random-assignment-with-two-treatment-options
+\dontrun{
+DTRs = learnDTR(X = TwoStg_Dat$X,
+                A = TwoStg_Dat$A,
+                Y = TwoStg_Dat$Y,
+                weights = rep(1, length(X)),
+                baseLearner  = c("BART"),
+                metaLearners = c("S", "T"),
+                include.X = 1,
+                include.A = 2,
+                include.Y = 0)
+}
 }
 \seealso{
 \code{\link{recommendDTR}}
