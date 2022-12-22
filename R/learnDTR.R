@@ -40,17 +40,15 @@
 #' @examples
 #' ## this is the sample adopted in:
 #' ## https://jzhou.org/posts/optdtr/#case-1-random-assignment-with-two-treatment-options
-#' \dontrun{
 #' DTRs = learnDTR(X = TwoStg_Dat$X,
 #'                 A = TwoStg_Dat$A,
 #'                 Y = TwoStg_Dat$Y,
-#'                 weights = rep(1, length(X)),
+#'                 weights = rep(1, 3),
 #'                 baseLearner  = c("BART"),
 #'                 metaLearners = c("S", "T"),
 #'                 include.X = 1,
 #'                 include.A = 2,
 #'                 include.Y = 0)
-#' }
 #' @import stats utils dbarts glmnet
 #' @export
 #' @seealso \code{\link{recommendDTR}}
