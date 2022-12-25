@@ -21,7 +21,7 @@ It allows to handle cases that the realized action/observation may not be consis
 with algorithm results. Only needed when \code{all.inclusive = TRUE}.
 Default is \code{NULL}.}
 
-\item{Y.new}{A list. Only required if \code{all.inclusive = TRUE} in \code{\link[=learnDTR]{learnDTR()}}. Default is \code{NULL}}
+\item{Y.new}{A list. Required if \code{include.Y > 0} in \code{\link[=learnDTR]{learnDTR()}}. Default is \code{NULL}}
 }
 \value{
 It returns the optimal action/treatment recommendations at each stage and results are stored in a list for

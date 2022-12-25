@@ -14,7 +14,8 @@ learnDTR(
   include.X = 0,
   include.A = 0,
   include.Y = 0,
-  verbose = TRUE
+  verbose = TRUE,
+  ...
 )
 }
 \arguments{
@@ -35,9 +36,10 @@ information.}
 \item{weights}{Weights on each stage of rewards. Default is all 1.}
 
 \item{baseLearner}{Choose one baselearner for meta-learn er algorithms. So far supports \code{BART} and
-\code{GAM} with splines and LASSO penalization.}
+\code{GAM} through package \code{glmnet}, which can provide variable selection by
+regularization.}
 
-\item{metaLearners}{Meta-learner algorithms to learn the optimal DTR. To support more than two actions
+\item{metaLearners}{\code{c("S", "T", "deC")}. Meta-learner algorithms to learn the optimal DTR. To support more than two actions
 at each stage, S-, A-, and deC-learner are available. But deC-learner only works when
 \code{baseLearner = "GAM"} so far.}
 
@@ -49,7 +51,9 @@ A included}
 \item{include.Y}{0 for no past reward/outcome Y included in analysis; 1 for only last Y included; 2 for all past
 Y included}
 
-\item{verbose}{Console print allowed?
+\item{verbose}{Console print allowed?}
+
+\item{...}{Additional arguments that can be passed to \code{dbarts::bart} or \code{glmnet::cv.glmnet}
 If \code{TRUE}, covariates adopted in training at stage \code{T} includes
 \code{X[[t]], t<=T}, \code{A[[t]], t<T}, and \code{Y[[t]], t<T}. In other words,
 \code{X} actually should only store additional covariates at each stage. Note that if
@@ -68,7 +72,11 @@ or observational ones. Multiple treatment options are supported.
 \details{
 This function supports to find the optimal dynamic treatment regime (DTR) for either randomized experiments
 or observational studies. Also, thanks to meta-learner structure, S-, T-, and deC-learner can naturally
-support multiple action options at any stage.
+support multiple action options at any stage. \cr
+\cr
+For \code{GAM}, the algorithm will not automatically project the covariates \code{X} or outcomes/rewards
+\code{Y} onto any bases-spanned spaces. User shall transform the covariates and/or  outcomes/rewards
+manually and then input the desired design matrix through inputs \code{X} and/or \code{Y}.
 }
 \examples{
 ## this is the sample adopted in:

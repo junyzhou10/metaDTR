@@ -15,8 +15,9 @@
 #'          \code{Y[[t]]} is suppose to be driven by the \code{X[[t]]} and action \code{A[[t]]}.
 #' @param weights Weights on each stage of rewards. Default is all 1.
 #' @param baseLearner Choose one baselearner for meta-learn er algorithms. So far supports \code{BART} and
-#'                    \code{GAM} with splines and LASSO penalization.
-#' @param metaLearners Meta-learner algorithms to learn the optimal DTR. To support more than two actions
+#'                    \code{GAM} through package \code{glmnet}, which can provide variable selection by
+#'                    regularization.
+#' @param metaLearners \code{c("S", "T", "deC")}. Meta-learner algorithms to learn the optimal DTR. To support more than two actions
 #'                     at each stage, S-, A-, and deC-learner are available. But deC-learner only works when
 #'                     \code{baseLearner = "GAM"} so far.
 #' @param include.X 0 for no past X included in analysis; 1 for all past X included
@@ -25,13 +26,18 @@
 #' @param include.Y 0 for no past reward/outcome Y included in analysis; 1 for only last Y included; 2 for all past
 #'                  Y included
 #' @param verbose Console print allowed?
+#' @param ... Additional arguments that can be passed to \code{dbarts::bart} or \code{glmnet::cv.glmnet}
 #' If \code{TRUE}, covariates adopted in training at stage \code{T} includes
 #'                      \code{X[[t]], t<=T}, \code{A[[t]], t<T}, and \code{Y[[t]], t<T}. In other words,
 #'                      \code{X} actually should only store additional covariates at each stage. Note that if
 #'                      there are subjects dropping out during the study, it will cause error.
 #' @details This function supports to find the optimal dynamic treatment regime (DTR) for either randomized experiments
 #'          or observational studies. Also, thanks to meta-learner structure, S-, T-, and deC-learner can naturally
-#'          support multiple action options at any stage.
+#'          support multiple action options at any stage. \cr
+#'          \cr
+#'          For \code{GAM}, the algorithm will not automatically project the covariates \code{X} or outcomes/rewards
+#'          \code{Y} onto any bases-spanned spaces. User shall transform the covariates and/or  outcomes/rewards
+#'          manually and then input the desired design matrix through inputs \code{X} and/or \code{Y}.
 #'
 #' @return It includes learning results, basically, the trained functions that can be used for predictions. Since
 #'         sequential recommendations might require intermediate observations, [learnDTR()] will not automatically
@@ -57,7 +63,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
                      baseLearner  = c("BART", "GAM"),
                      metaLearners = c("S", "T", "deC"),
                      include.X = 0, include.A = 0, include.Y = 0,
-                     verbose = TRUE
+                     verbose = TRUE, ...
 ) {
   n.stage = length(X)
   ######==================== check inputs ====================
@@ -126,7 +132,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         dat.train = dat.S[1:n.train,]; dat.test = dat.S[-(1:n.train),]
         ## train by bart:
         S.fit = bart(x.train = dat.train, y.train = V.est, x.test = dat.test,
-                     ntree = 200, keeptrees = TRUE, verbose = FALSE)
+                     ntree = 200, keeptrees = TRUE, verbose = FALSE, ...)
         S.est = matrix(colMeans(S.fit$yhat.test), ncol = length(K.grp), byrow = F)
         ## KEY: update V.est properly
         V.est = apply(S.est, 1, max)
@@ -135,7 +141,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
       }
       names(S.learners) <- paste("S", seq(n.stage, by = -1), sep = ".")
       if (verbose) {
-        print("S-learner traning done!!")
+        print("S-learner training (BART) done!!")
       }
     }
 
@@ -185,7 +191,8 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         for (ii in K.grp) {
           T.fit = bart(x.train = X.tr[A.tr==ii,], y.train = V.est[A.tr==ii], x.test = X.tr,
                        ntree = 200, keeptrees = TRUE, verbose = FALSE,
-                       sigest = ifelse(as.numeric(table(A.tr)[paste(ii)]) < 1.05*ncol(X.tr), 1, NA))  # in case n<p
+                       sigest = ifelse(as.numeric(table(A.tr)[paste(ii)]) < 1.05*ncol(X.tr), 1, NA),# in case n<p
+                       ...)
           T.est = cbind(T.est, colMeans(T.fit$yhat.test))
           T.stage = c(T.stage, list(T.fit))
         }
@@ -197,7 +204,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
       }
       names(T.learners) <- paste("T", seq(n.stage, by = -1), sep = ".")
       if (verbose) {
-        print("T-learner traning done!!")
+        print("T-learner training (BART) done!!")
       }
     }
   }
@@ -207,6 +214,243 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
   ######==================== GAM as baselearner ====================
   if (baseLearner[1] == "GAM") {
 
+    ######============  S-learner  ============
+    if ("S" %in% metaLearners) {
+      V.est = 0; S.learners = list()
+      for (stage in seq(n.stage, by = -1)) {
+
+        n.train = nrow(X[[stage]])
+        ## construct training dataset
+        if (stage == 1) {
+          X.tr = data.frame(X = X[[stage]])
+        } else {
+          ## note the sequence of X, A, Y
+          if (include.X == 1) {
+            X.tr = data.frame(X = matrix(unlist(X[1:stage]), nrow = n.train, byrow = FALSE))
+          } else {
+            X.tr = data.frame(X = X[[stage]])
+          }
+          if (include.A == 1) { # nothing need to do when include.A == 0
+            A.tmp = data.frame(A = A[[stage-1]])
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.tr = cbind(X.tr, A.tmp)
+          } else if (include.A == 2) {
+            A.tmp = data.frame(A = matrix(unlist(A[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.tr = cbind(X.tr, A.tmp)
+          }
+          if (include.Y == 1) { # nothing need to do when include.Y == 0
+            Y.tmp = data.frame(Y = Y[[stage-1]])
+            X.tr = cbind(X.tr, Y.tmp)
+          } else if (include.Y == 2) {
+            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            X.tr = cbind(X.tr, Y.tmp)
+          }
+        }
+
+        A.tr = A[[stage]]
+        Y.tr = Y[[stage]]
+        K.grp = sort(unique(A.tr))
+        V.est = V.est + Y.tr*weights[stage]
+        ## generate data set for S-learner:
+        dat.train = data.frame(trt = A.tr, X.tr)
+        dat.tmp = dat.train
+        for (ii in K.grp) {
+          tmp = data.frame(trt = ii, X.tr)
+          dat.tmp = rbind(dat.tmp, tmp)
+        }
+        dat.tmp$trt = as.factor(dat.tmp$trt)
+        dat.S = stats::model.matrix(~trt*.-1, dat.tmp)
+        dat.train = dat.S[1:n.train,]; dat.test = dat.S[-(1:n.train),]
+        ## train by glmnet with LASSO penalty:
+        S.fit = cv.glmnet(dat.train, V.est, family = "gaussian", parallel = TRUE, ...)
+        S.est = matrix(predict(S.fit, newx = dat.test, type = "response", s = "lambda.min"), ncol = length(K.grp), byrow = F)
+
+        ## KEY: update V.est properly
+        V.est = apply(S.est, 1, max)
+        ## Store the trained learners
+        S.learners = c(S.learners, list(S.fit))
+      }
+      names(S.learners) <- paste("S", seq(n.stage, by = -1), sep = ".")
+      if (verbose) {
+        print("S-learner training (GAM) done !!")
+      }
+    }
+
+
+    ######============  T-learner  ============
+    if ("T" %in% metaLearners) {
+      V.est = 0; T.learners = list()
+      for (stage in seq(n.stage, by = -1)) {
+        n.train = nrow(X[[stage]])
+        ## construct training dataset
+        if (stage == 1) {
+          X.tr = data.frame(X = X[[stage]])
+        } else {
+          ## note the sequence of X, A, Y
+          if (include.X == 1) {
+            X.tr = data.frame(X = matrix(unlist(X[1:stage]), nrow = n.train, byrow = FALSE))
+          } else {
+            X.tr = data.frame(X = X[[stage]])
+          }
+          if (include.A == 1) { # nothing need to do when include.A == 0
+            A.tmp = data.frame(A = A[[stage-1]])
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.tr = cbind(X.tr, A.tmp)
+          } else if (include.A == 2) {
+            A.tmp = data.frame(A = matrix(unlist(A[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.tr = cbind(X.tr, A.tmp)
+          }
+          if (include.Y == 1) { # nothing need to do when include.Y == 0
+            Y.tmp = data.frame(Y = Y[[stage-1]])
+            X.tr = cbind(X.tr, Y.tmp)
+          } else if (include.Y == 2) {
+            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            X.tr = cbind(X.tr, Y.tmp)
+          }
+        }
+        A.tr = A[[stage]]
+        Y.tr = Y[[stage]]
+        K.grp = sort(unique(A.tr))
+        n.train = nrow(X.tr)
+        V.est = V.est + Y.tr*weights[stage]
+        ## directly train T-learner with glmnet:
+        T.est = NULL; T.stage = list();
+        for (ii in K.grp) {
+          T.fit = cv.glmnet(stats::model.matrix(~.-1, X.tr)[A.tr==ii,], V.est[A.tr==ii], family = "gaussian", parallel = TRUE, ...)
+          T.est = cbind(T.est, predict(T.fit, newx = stats::model.matrix(~.-1, X.tr), type = "response", s = "lambda.min"))
+          T.stage = c(T.stage, list(T.fit))
+        }
+
+        ## KEY: update V.est properly
+        V.est = apply(T.est, 1, max)
+        ## Store the trained learners
+        names(T.stage) <- paste("A", K.grp, sep = ".")
+        T.learners = c(T.learners, list(T.stage))
+      }
+      names(T.learners) <- paste("T", seq(n.stage, by = -1), sep = ".")
+      if (verbose) {
+        print("T-learner training (GAM) done!!")
+      }
+    }
+
+
+
+    ######============  deC-learner  ============
+    if ("deC" %in% metaLearners) {
+      V.est = 0; deC.learners = list()
+      for (stage in seq(n.stage, by = -1)) {
+
+        # generate simplex coordinates
+        k = length(A.list[[stage]])
+        z = rep(1, k-1)
+        e = diag(x = 1, k-1)
+        W = cbind((k-1)^(-0.5) * z,  (k/(k-1))^(0.5)*e - z*(1+sqrt(k))/(k-1)^1.5)
+
+        n.train = nrow(X[[stage]])
+        ## construct training dataset
+        if (stage == 1) {
+          X.tr = data.frame(X = X[[stage]])
+        } else {
+          ## note the sequence of X, A, Y
+          if (include.X == 1) {
+            X.tr = data.frame(X = matrix(unlist(X[1:stage]), nrow = n.train, byrow = FALSE))
+          } else {
+            X.tr = data.frame(X = X[[stage]])
+          }
+          if (include.A == 1) { # nothing need to do when include.A == 0
+            A.tmp = data.frame(A = A[[stage-1]])
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.tr = cbind(X.tr, A.tmp)
+          } else if (include.A == 2) {
+            A.tmp = data.frame(A = matrix(unlist(A[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.tr = cbind(X.tr, A.tmp)
+          }
+          if (include.Y == 1) { # nothing need to do when include.Y == 0
+            Y.tmp = data.frame(Y = Y[[stage-1]])
+            X.tr = cbind(X.tr, Y.tmp)
+          } else if (include.Y == 2) {
+            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            X.tr = cbind(X.tr, Y.tmp)
+          }
+        }
+        A.tr = A[[stage]]
+        Y.tr = Y[[stage]]
+        K.grp = sort(unique(A.tr))
+        n.train = nrow(X.tr)
+        V.est = V.est + Y.tr*weights[stage]
+
+        ## train S-learner with glmnet:
+        ## generate data set for S-learner:
+        dat.train = data.frame(trt = A.tr, X.tr)
+        dat.tmp = dat.train
+        for (ii in K.grp) {
+          tmp = data.frame(trt = ii, X.tr)
+          dat.tmp = rbind(dat.tmp, tmp)
+        }
+        dat.tmp$trt = as.factor(dat.tmp$trt)
+        dat.S = stats::model.matrix(~trt*.-1, dat.tmp)
+        dat.train = dat.S[1:n.train,]; dat.test = dat.S[-(1:n.train),]
+        if (is.null(S.learners)) {
+          ## train by glmnet with LASSO penalty:
+          S.fit = cv.glmnet(dat.train, V.est, family = "gaussian", parallel = TRUE, ...)
+        } else {
+          S.fit = S.learners[[n.stage - stage + 1]]
+        }
+        S.est = matrix(predict(S.fit, newx = dat.test, type = "response", s = "lambda.min"), ncol = length(K.grp), byrow = F)
+
+        ## train T-learner with glmnet:
+        T.est = NULL; T.stage = list();
+        for (ii in K.grp) {
+          if (is.null(T.learners)) {
+            T.fit = cv.glmnet(stats::model.matrix(~.-1, X.tr)[A.tr==ii,], V.est[A.tr==ii], family = "gaussian", parallel = TRUE, ...)
+          } else {
+            T.fit <- T.learners[[n.stage - stage + 1]][[which(K.grp == ii)]]
+          }
+          T.est = cbind(T.est, predict(T.fit, newx = stats::model.matrix(~.-1, X.tr), type = "response", s = "lambda.min"))
+        }
+        ## obtain nuisance parameter h():
+        h.hat = rowMeans(cbind(S.est, T.est))
+
+        ## estimate optimal treatment via deC-learner:
+        # transform data X into required shape:
+        x.whole = stats::model.matrix(~., X.tr); trt = as.numeric(as.factor(A.tr))
+        x.new = sapply(seq(n.train), function(i){
+          as.vector(outer(W[,trt[i]], x.whole[i,]))
+        })
+        x.new = t(x.new)
+        penalty_f = c(rep(0,k-1), rep(1, (ncol(x.whole)-1)*(k-1)))
+        fit.tau  = cv.glmnet(x.new, V.est-h.hat, family = "gaussian", parallel = TRUE, maxit = 100000, penalty.factor = penalty_f, intercept=FALSE)
+        ## estimated treatment effect:
+        best.beta = stats::coef(fit.tau,s="lambda.min")
+        best.beta = matrix(best.beta[-1], nrow = ncol(x.whole), byrow = T)
+        deC.est   = x.whole %*% best.beta %*% W
+
+        ## KEY: update V.est properly
+        V.est = apply(deC.est, 1, max) + h.hat # i add h.hat back here
+
+        ## Store the trained learners
+        deC.learners = c(deC.learners, list(best.beta))
+      }
+      names(deC.learners) <- paste("deC", seq(n.stage, by = -1), sep = ".")
+      if (verbose) {
+        print("deC-learner training (GAM) done!!")
+      }
+    }
   }
 
   ######========== Prepare outputs
@@ -216,7 +460,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
                  controls = list(
                    n.stage = n.stage,
                    A.list  = A.list,
-                   baseLearner   = baseLearner,
+                   baseLearner   = baseLearner[1],
                    metaLearners  = metaLearners,
                    include.X = include.X,
                    include.Y = include.Y,

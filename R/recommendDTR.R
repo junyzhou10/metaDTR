@@ -2,16 +2,16 @@
 #' @author Junyi Zhou \email{junyzhou@iu.edu}
 #' @description This function make recommendations of optimal treatment for a given subject at given stage
 #' @param DTRs Output from [learnDTR()] that belong to class \code{metaDTR}.
-#' @param X.new A list of covariates at each stage. In practice, since recommendations are made
-#'              stage by stage, here one stage of \code{X.new} will provide one stage's recommendation of action.
 #' @param currentDTRs Object from [recommendDTR()]. Records the results from previous stages so that users can
 #'                    flexibly make predictions stage by stage. See details and example.
+#' @param X.new A list of covariates at each stage. In practice, since recommendations are made
+#'              stage by stage, here one stage of \code{X.new} will provide one stage's recommendation of action.
 #' @param A.new A list of observed or predicted actions (from the algorithm). Users can provide real actions observed
 #'              rather than algorithm recommended to make this function more flexible.
 #'              It allows to handle cases that the realized action/observation may not be consistent
 #'              with algorithm results. Only needed when \code{all.inclusive = TRUE}.
 #'              Default is \code{NULL}.
-#' @param Y.new A list. Only required if \code{all.inclusive = TRUE} in [learnDTR()]. Default is \code{NULL}
+#' @param Y.new A list. Required if \code{include.Y > 0} in [learnDTR()]. Default is \code{NULL}
 #' @details This function make recommendations based on the trained learners from [learnDTR()] for new dataset.
 #'          Since in real application, later stage covariates/outcomes are unobservable until treatments are
 #'          assigned. So in most cases, [recommendDTR()] needs to be applied stage by stage, which is allowed in
@@ -29,7 +29,6 @@
 recommendDTR <- function(DTRs, currentDTRs = NULL,
                          X.new, A.new = NULL, Y.new = NULL) {
   n.stage <- DTRs$controls$n.stage
-  all.inclusive <- DTRs$controls$all.inclusive
   baseLearner <- DTRs$controls$baseLearner
   metaLearners <- DTRs$controls$metaLearners
   A.list <- DTRs$controls$A.list
@@ -73,8 +72,8 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
 
 
 
-  ######==================== bart as base learner ====================
-  if (baseLearner[1] == "BART") {
+  ######==================== bart/gam as base learner ====================
+  if (baseLearner %in% c("BART", "GAM")) {
     ######============  S-learner  ============
     if ("S" %in% metaLearners) {
       for (stage in seq(start, n.step, by = 1)) { # forward now
@@ -121,8 +120,14 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
           dat.tmp = rbind(dat.tmp, data.frame(trt = ii, X.te))
         }
         dat.tmp$trt = as.factor(dat.tmp$trt)
-        Y.pred = colMeans(predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = stats::model.matrix(~trt*.-1, dat.tmp)))
-        Y.pred = matrix(Y.pred, ncol = length(A.list[[stage]]), byrow = F)
+        if (baseLearner == "BART") {
+          Y.pred = colMeans(predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = stats::model.matrix(~trt*.-1, dat.tmp)))
+          Y.pred = matrix(Y.pred, ncol = length(A.list[[stage]]), byrow = F)
+        }
+        if (baseLearner == "GAM") {
+          Y.pred = matrix(predict(DTRs$S.learners[[n.stage - stage + 1]], newx = stats::model.matrix(~trt*.-1, dat.tmp),
+                                 type = "response", s = "lambda.min"), ncol = length(A.list[[stage]]), byrow = F)
+        }
         A.pred = A.list[[stage]][apply(Y.pred, 1, which.max)]
         A.opt.S = c(A.opt.S, list(A.pred))
         A.new <- c(A.new, list(A.pred))
@@ -173,7 +178,13 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
         ## predict outcome based on trained learners:
         Y.pred <- NULL
         for (ii in seq(length(A.list[[stage]]))) {
-          Y.pred = cbind(Y.pred, colMeans(predict(DTRs$T.learners[[n.stage - stage + 1]][[ii]], newdata = X.te)))
+          if (baseLearner == "GAM") {
+            Y.pred = cbind(Y.pred, predict(DTRs$T.learners[[n.stage - stage + 1]][[ii]], newx = stats::model.matrix(~.-1, X.te),
+                                           type = "response", s = "lambda.min"))
+          }
+          if (baseLearner == "BART") {
+            Y.pred = cbind(Y.pred, colMeans(predict(DTRs$T.learners[[n.stage - stage + 1]][[ii]], newdata = X.te)))
+          }
         }
         A.pred = A.list[[stage]][apply(Y.pred, 1, which.max)]
         A.opt.T = c(A.opt.T, list(A.pred))
@@ -181,14 +192,67 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
       }
       names(A.opt.T) <- c(names(currentDTRs$A.opt.T), paste("Stage", seq(start, n.step, by = 1), sep = "."))
     }
+
+
+
+    ######============  deC-learner  ============
+    if ("deC" %in% metaLearners) {
+      for (stage in seq(start, n.step, by = 1)) {
+        n.test = nrow(X.new[[stage]])
+        # generate simplex coordinates
+        k = length(A.list[[stage]])
+        z = rep(1, k-1)
+        e = diag(x = 1, k-1)
+        W = cbind((k-1)^(-0.5) * z,  (k/(k-1))^(0.5)*e - z*(1+sqrt(k))/(k-1)^1.5)
+
+        ## retrieve training dataset structures
+        if (stage == 1) {
+          X.te = data.frame(X = X.new[[stage]])
+        } else {
+          ## follow the sequence of X, A, Y
+          if (include.X == 1) {
+            X.te = data.frame(X = matrix(unlist(X.new[1:stage]), nrow = n.test, byrow = FALSE))
+          } else {
+            X.te = data.frame(X = X.new[[stage]])
+          }
+          ## override is triggered
+          A.new <- A.opt.deC
+          A.new[A.ind] <- A.obs[A.ind]
+          if (include.A == 1) { # nothing need to do when include.A == 0
+            A.tmp = data.frame(A = A.new[[stage-1]])
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.te = cbind(X.te, A.tmp)
+          } else if (include.A == 2) {
+            A.tmp = data.frame(A = matrix(unlist(A.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
+            for (ii in seq(ncol(A.tmp))) {
+              A.tmp[,ii] <- as.factor(A.tmp[,ii])
+            }
+            X.te = cbind(X.te, A.tmp)
+          }
+          if (include.Y == 1) { # nothing need to do when include.Y == 0
+            Y.tmp = data.frame(Y = Y.new[[stage-1]])
+            X.te = cbind(X.te, Y.tmp)
+          } else if (include.Y == 2) {
+            Y.tmp = data.frame(Y = matrix(unlist(Y.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
+            X.te = cbind(X.te, Y.tmp)
+          }
+        }
+
+        ## predict outcome based on trained betas:
+        Y.pred = stats::model.matrix(~., X.te) %*% DTRs$deC.learners[[n.stage - stage + 1]] %*% W
+        A.pred = A.list[[stage]][apply(Y.pred, 1, which.max)]
+        A.opt.deC = c(A.opt.deC, list(A.pred))
+        A.new <- c(A.new, list(A.pred))
+      }
+      names(A.opt.deC) <- c(names(currentDTRs$A.opt.deC), paste("Stage", seq(start, n.step, by = 1), sep = "."))
+    }
+
+
+
   }
 
-
-
-  ######==================== GAM as base learner ====================
-  if (baseLearner[1] == "GAM") {
-
-  }
 
   ######========== Prepare outputs
   OptDTR <- list(A.opt.S = A.opt.S,
@@ -201,8 +265,7 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
                    n.stage = n.stage,
                    A.list  = A.list,
                    baseLearner   = baseLearner,
-                   metaLearners  = metaLearners,
-                   all.inclusive = all.inclusive
+                   metaLearners  = metaLearners
                  )
   )
   class(OptDTR) <- "metaDTR"
