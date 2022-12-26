@@ -108,10 +108,8 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
             }
             X.tr = cbind(X.tr, A.tmp)
           } else if (include.A == 2) {
-            A.tmp = data.frame(A = matrix(unlist(A[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
-            for (ii in seq(ncol(A.tmp))) {
-              A.tmp[,ii] <- as.factor(A.tmp[,ii])
-            }
+            A.tmp = do.call(cbind.data.frame, A[1:(stage-1)])
+            colnames(A.tmp) <- paste("A", 1:(stage-1), sep = ".")
             X.tr = cbind(X.tr, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
@@ -174,10 +172,8 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
             }
             X.tr = cbind(X.tr, A.tmp)
           } else if (include.A == 2) {
-            A.tmp = data.frame(A = matrix(unlist(A[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
-            for (ii in seq(ncol(A.tmp))) {
-              A.tmp[,ii] <- as.factor(A.tmp[,ii])
-            }
+            A.tmp = do.call(cbind.data.frame, A[1:(stage-1)])
+            colnames(A.tmp) <- paste("A", 1:(stage-1), sep = ".")
             X.tr = cbind(X.tr, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
@@ -244,10 +240,8 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
             }
             X.tr = cbind(X.tr, A.tmp)
           } else if (include.A == 2) {
-            A.tmp = data.frame(A = matrix(unlist(A[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
-            for (ii in seq(ncol(A.tmp))) {
-              A.tmp[,ii] <- as.factor(A.tmp[,ii])
-            }
+            A.tmp = do.call(cbind.data.frame, A[1:(stage-1)])
+            colnames(A.tmp) <- paste("A", 1:(stage-1), sep = ".")
             X.tr = cbind(X.tr, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
@@ -311,10 +305,8 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
             }
             X.tr = cbind(X.tr, A.tmp)
           } else if (include.A == 2) {
-            A.tmp = data.frame(A = matrix(unlist(A[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
-            for (ii in seq(ncol(A.tmp))) {
-              A.tmp[,ii] <- as.factor(A.tmp[,ii])
-            }
+            A.tmp = do.call(cbind.data.frame, A[1:(stage-1)])
+            colnames(A.tmp) <- paste("A", 1:(stage-1), sep = ".")
             X.tr = cbind(X.tr, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
@@ -381,10 +373,8 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
             }
             X.tr = cbind(X.tr, A.tmp)
           } else if (include.A == 2) {
-            A.tmp = data.frame(A = matrix(unlist(A[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
-            for (ii in seq(ncol(A.tmp))) {
-              A.tmp[,ii] <- as.factor(A.tmp[,ii])
-            }
+            A.tmp = do.call(cbind.data.frame, A[1:(stage-1)])
+            colnames(A.tmp) <- paste("A", 1:(stage-1), sep = ".")
             X.tr = cbind(X.tr, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0

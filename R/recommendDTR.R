@@ -94,15 +94,11 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
           A.new[A.ind] <- A.obs[A.ind]
           if (include.A == 1) { # nothing need to do when include.A == 0
             A.tmp = data.frame(A = A.new[[stage-1]])
-            # for (ii in seq(ncol(A.tmp))) {
-            #   A.tmp[,ii] <- A.tmp[,ii]
-            # }
             X.te = cbind(X.te, A.tmp)
           } else if (include.A == 2) {
-            A.tmp = data.frame(A = matrix(unlist(A.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
-            # for (ii in seq(ncol(A.tmp))) {
-            #   A.tmp[,ii] <- A.tmp[,ii]
-            # }
+            A.tmp = do.call(cbind.data.frame, A.new[1:(stage-1)])
+            colnames(A.tmp) <- paste("A", 1:(stage-1), sep = ".")
+            # A.tmp = data.frame(A = matrix(unlist(A.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
             X.te = cbind(X.te, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
@@ -157,7 +153,9 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
             A.tmp = data.frame(A = A.new[[stage-1]])
             X.te = cbind(X.te, A.tmp)
           } else if (include.A == 2) {
-            A.tmp = data.frame(A = matrix(unlist(A.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
+            A.tmp = do.call(cbind.data.frame, A.new[1:(stage-1)])
+            colnames(A.tmp) <- paste("A", 1:(stage-1), sep = ".")
+            # A.tmp = data.frame(A = matrix(unlist(A.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
             X.te = cbind(X.te, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
@@ -216,7 +214,9 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
             A.tmp = data.frame(A = A.new[[stage-1]])
             X.te = cbind(X.te, A.tmp)
           } else if (include.A == 2) {
-            A.tmp = data.frame(A = matrix(unlist(A.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
+            A.tmp = do.call(cbind.data.frame, A.new[1:(stage-1)])
+            colnames(A.tmp) <- paste("A", 1:(stage-1), sep = ".")
+            # A.tmp = data.frame(A = matrix(unlist(A.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
             X.te = cbind(X.te, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
