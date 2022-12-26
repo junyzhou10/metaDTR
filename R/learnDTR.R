@@ -56,6 +56,13 @@
 #'                 include.A = 2,
 #'                 include.Y = 0)
 #' @import stats utils dbarts glmnet
+#' @references
+#' Künzel, Sören R., Jasjeet S. Sekhon, Peter J. Bickel, and Bin Yu.
+#' "Metalearners for estimating heterogeneous treatment effects using machine learning."
+#' *Proceedings of the national academy of sciences* 116, no. 10 (2019): 4156-4165.
+#' \cr\cr
+#' Zhou, Junyi, Ying Zhang, and Wanzhu Tu. "A reference-free R-learner for treatment recommendation."
+#' *Statistical Methods in Medical Research* (2022)
 #' @export
 #' @seealso \code{\link{recommendDTR}}
 
