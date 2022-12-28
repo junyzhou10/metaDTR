@@ -94,6 +94,10 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
     if ("S" %in% metaLearners) {
       V.est = 0; S.learners = list()
       for (stage in seq(n.stage, by = -1)) {
+        if (verbose) {
+          print(paste0(Sys.time(), " @Stage(BART/S-): ", stage))
+        }
+
         n.train = nrow(X[[stage]])
         ## construct training dataset
         if (stage == 1) {
@@ -140,9 +144,9 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         dat.S = stats::model.matrix(~trt*.-1, dat.tmp)
         dat.train = dat.S[1:n.train,]; dat.test = dat.S[-(1:n.train),]
         ## train by bart:
-        S.fit = bart(x.train = dat.train, y.train = V.est, x.test = dat.test,
+        S.fit = bart(x.train = dat.train, y.train = V.est, keeptrainfits = F,
                      ntree = 200, keeptrees = TRUE, verbose = FALSE, ...)
-        S.est = matrix(colMeans(S.fit$yhat.test), ncol = length(K.grp), byrow = F)
+        S.est = matrix(colMeans(predict(S.fit, newdata = dat.test)), ncol = length(K.grp), byrow = F)
         ## KEY: update V.est properly
         V.est = apply(S.est, 1, max)
         ## Store the trained learners
@@ -150,7 +154,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
       }
       names(S.learners) <- paste("S", seq(n.stage, by = -1), sep = ".")
       if (verbose) {
-        print("S-learner training (BART) done!!")
+        print(paste0(Sys.time(), ": S-learner training (BART) done!!"))
       }
     }
 
@@ -158,6 +162,9 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
     if ("T" %in% metaLearners) {
       V.est = 0; T.learners = list()
       for (stage in seq(n.stage, by = -1)) {
+        if (verbose) {
+          print(paste0(Sys.time(), " @Stage(BART/T-): ", stage))
+        }
         n.train = nrow(X[[stage]])
         ## construct training dataset
         if (stage == 1) {
@@ -203,11 +210,11 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
           }
         }
         for (ii in K.grp) {
-          T.fit = bart(x.train = X.tr[A.tr==ii,], y.train = V.est[A.tr==ii], x.test = X.tr,
+          T.fit = bart(x.train = X.tr[A.tr==ii,], y.train = V.est[A.tr==ii], keeptrainfits = F,
                        ntree = 200, keeptrees = TRUE, verbose = FALSE,
                        sigest = est.sigma,
                        ...)
-          T.est = cbind(T.est, colMeans(T.fit$yhat.test))
+          T.est = cbind(T.est, colMeans(predict(T.fit, newdata = X.tr)))
           T.stage = c(T.stage, list(T.fit))
         }
         ## KEY: update V.est properly
@@ -218,7 +225,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
       }
       names(T.learners) <- paste("T", seq(n.stage, by = -1), sep = ".")
       if (verbose) {
-        print("T-learner training (BART) done!!")
+        print(paste0(Sys.time(), ": T-learner training (BART) done!!"))
       }
     }
   }
@@ -232,6 +239,9 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
     if ("S" %in% metaLearners) {
       V.est = 0; S.learners = list()
       for (stage in seq(n.stage, by = -1)) {
+        if (verbose) {
+          print(paste0(Sys.time(), " @Stage(GAM/S-): ", stage))
+        }
 
         n.train = nrow(X[[stage]])
         ## construct training dataset
@@ -289,7 +299,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
       }
       names(S.learners) <- paste("S", seq(n.stage, by = -1), sep = ".")
       if (verbose) {
-        print("S-learner training (GAM) done !!")
+        print(paste0(Sys.time(), ": S-learner training (GAM) done!!"))
       }
     }
 
@@ -298,6 +308,10 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
     if ("T" %in% metaLearners) {
       V.est = 0; T.learners = list()
       for (stage in seq(n.stage, by = -1)) {
+        if (verbose) {
+          print(paste0(Sys.time(), " @Stage(GAM/T-): ", stage))
+        }
+
         n.train = nrow(X[[stage]])
         ## construct training dataset
         if (stage == 1) {
@@ -349,7 +363,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
       }
       names(T.learners) <- paste("T", seq(n.stage, by = -1), sep = ".")
       if (verbose) {
-        print("T-learner training (GAM) done!!")
+        print(paste0(Sys.time(), ": T-learner training (GAM) done!!"))
       }
     }
 
@@ -359,6 +373,9 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
     if ("deC" %in% metaLearners) {
       V.est = 0; deC.learners = list()
       for (stage in seq(n.stage, by = -1)) {
+        if (verbose) {
+          print(paste0(Sys.time(), " @Stage(GAM/deC-): ", stage))
+        }
 
         # generate simplex coordinates
         k = length(A.list[[stage]])
@@ -456,7 +473,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
       }
       names(deC.learners) <- paste("deC", seq(n.stage, by = -1), sep = ".")
       if (verbose) {
-        print("deC-learner training (GAM) done!!")
+        print(paste0(Sys.time(), ": deC-learner training (GAM) done!!"))
       }
     }
   }
