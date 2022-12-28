@@ -14,6 +14,7 @@ learnDTR(
   include.X = 0,
   include.A = 0,
   include.Y = 0,
+  est.sigma = NULL,
   verbose = TRUE,
   ...
 )
@@ -51,6 +52,10 @@ A included}
 \item{include.Y}{0 for no past reward/outcome Y included in analysis; 1 for only last Y included; 2 for all past
 Y included}
 
+\item{est.sigma}{Initial estimation of sigma. Only for T-learner with BART. If sample size is not enough to estimate
+surface separately, or algorithm experience some trouble in getting sigma, use this argument to
+provide an initial estimate.}
+
 \item{verbose}{Console print allowed?}
 
 \item{...}{Additional arguments that can be passed to \code{dbarts::bart} or \code{glmnet::cv.glmnet}
@@ -61,7 +66,7 @@ there are subjects dropping out during the study, it will cause error.}
 }
 \value{
 It includes learning results, basically, the trained functions that can be used for predictions. Since
-sequential recommendations might require intermediate observations, \code{\link[=learnDTR]{learnDTR()}} will not automatically
+sequential recommendations might require intermediate observations, \link{learnDTR} will not automatically
 provide prediction. But by another function \link{recommendDTR},
 predictions can flexibly been made stage by stage.
 }

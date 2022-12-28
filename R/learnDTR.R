@@ -25,6 +25,9 @@
 #'                  A included
 #' @param include.Y 0 for no past reward/outcome Y included in analysis; 1 for only last Y included; 2 for all past
 #'                  Y included
+#' @param est.sigma Initial estimation of sigma. Only for T-learner with BART. If sample size is not enough to estimate
+#'                  surface separately, or algorithm experience some trouble in getting sigma, use this argument to
+#'                  provide an initial estimate.
 #' @param verbose Console print allowed?
 #' @param ... Additional arguments that can be passed to \code{dbarts::bart} or \code{glmnet::cv.glmnet}
 #' If \code{TRUE}, covariates adopted in training at stage \code{T} includes
@@ -40,7 +43,7 @@
 #'          manually and then input the desired design matrix through inputs \code{X} and/or \code{Y}.
 #'
 #' @return It includes learning results, basically, the trained functions that can be used for predictions. Since
-#'         sequential recommendations might require intermediate observations, [learnDTR()] will not automatically
+#'         sequential recommendations might require intermediate observations, [learnDTR] will not automatically
 #'         provide prediction. But by another function [recommendDTR],
 #'         predictions can flexibly been made stage by stage.
 #' @examples
@@ -70,6 +73,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
                      baseLearner  = c("BART", "GAM"),
                      metaLearners = c("S", "T", "deC"),
                      include.X = 0, include.A = 0, include.Y = 0,
+                     est.sigma = NULL,
                      verbose = TRUE, ...
 ) {
   n.stage = length(X)
@@ -191,10 +195,17 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         V.est = V.est + Y.tr*weights[stage]
         ## directly train T-learner with bart:
         T.est = NULL; T.stage = list();
+        if (is.null(est.sigma)) {
+          if (as.numeric(table(A.tr)[paste(ii)]) < 1.05*ncol(X.tr)) {# in case n<p
+            est.sigma = 1
+          } else {
+            est.sigma = NA
+          }
+        }
         for (ii in K.grp) {
           T.fit = bart(x.train = X.tr[A.tr==ii,], y.train = V.est[A.tr==ii], x.test = X.tr,
                        ntree = 200, keeptrees = TRUE, verbose = FALSE,
-                       sigest = ifelse(as.numeric(table(A.tr)[paste(ii)]) < 1.05*ncol(X.tr), 1, NA),# in case n<p
+                       sigest = est.sigma,
                        ...)
           T.est = cbind(T.est, colMeans(T.fit$yhat.test))
           T.stage = c(T.stage, list(T.fit))
