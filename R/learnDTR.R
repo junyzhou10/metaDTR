@@ -153,6 +153,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         ## Store the trained learners
         S.learners = c(S.learners, list(S.fit))
         remove("S.fit")
+        gc(verbose = FALSE)
       }
       names(S.learners) <- paste("S", seq(n.stage, by = -1), sep = ".")
       if (verbose) {
@@ -223,6 +224,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
                        ...)
           T.est = cbind(T.est, colMeans(predict(T.fit, newdata = X.tr ) ) )
           T.stage = c(T.stage, list(T.fit))
+          gc(verbose = FALSE)
         }
         ## KEY: update V.est properly
         V.est = apply(T.est, 1, max)
