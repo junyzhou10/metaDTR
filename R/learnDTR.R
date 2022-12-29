@@ -134,8 +134,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         K.grp = sort(unique(A.tr))
         V.est = V.est + Y.tr*weights[stage]
         ## generate data set for S-learner:
-        dat.train = data.frame(trt = A.tr, X.tr)
-        dat.tmp = dat.train
+        dat.tmp = data.frame(trt = A.tr, X.tr)
         for (ii in K.grp) {
           tmp = data.frame(trt = ii, X.tr)
           dat.tmp = rbind(dat.tmp, tmp)
@@ -149,8 +148,11 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         S.est = matrix(colMeans(predict(S.fit, newdata = dat.test)), ncol = length(K.grp), byrow = F)
         ## KEY: update V.est properly
         V.est = apply(S.est, 1, max)
+        ## clean some memory:
+        remove("S.est", "dat.train", "dat.test")
         ## Store the trained learners
         S.learners = c(S.learners, list(S.fit))
+        remove("S.fit")
       }
       names(S.learners) <- paste("S", seq(n.stage, by = -1), sep = ".")
       if (verbose) {
@@ -202,23 +204,30 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         V.est = V.est + Y.tr*weights[stage]
         ## directly train T-learner with bart:
         T.est = NULL; T.stage = list();
-        if (is.null(est.sigma)) {
-          if (as.numeric(table(A.tr)[paste(ii)]) < 1.05*ncol(X.tr)) {# in case n<p
-            est.sigma = 1
-          } else {
-            est.sigma = NA
-          }
-        }
+
         for (ii in K.grp) {
+          if (is.null(est.sigma)) {
+            if (as.numeric(table(A.tr)[paste(ii)]) < 1.05*ncol(X.tr)) {# in case n<p
+              est.sigma = 1
+            } else {
+              est.sigma = NA
+            }
+          }
+          ## if use BART package rather than dbarts
+          # T.fit = mc.wbart(x.train = X.tr[A.tr==ii,], y.train = V.est[A.tr==ii],
+          #                  ntree = 200L, keeptrainfits = FALSE, ...)
+          ## if fit by dbarts
           T.fit = bart(x.train = X.tr[A.tr==ii,], y.train = V.est[A.tr==ii], keeptrainfits = F,
                        ntree = 200, keeptrees = TRUE, verbose = FALSE,
                        sigest = est.sigma,
                        ...)
-          T.est = cbind(T.est, colMeans(predict(T.fit, newdata = X.tr)))
+          T.est = cbind(T.est, colMeans(predict(T.fit, newdata = X.tr ) ) )
           T.stage = c(T.stage, list(T.fit))
         }
         ## KEY: update V.est properly
         V.est = apply(T.est, 1, max)
+        ## clean some memory:
+        remove("T.fit", "T.est", "X.tr")
         ## Store the trained learners
         names(T.stage) <- paste("A", K.grp, sep = ".")
         T.learners = c(T.learners, list(T.stage))
