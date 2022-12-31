@@ -81,11 +81,9 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
   if (length(unique(length(X), length(A), length(Y))) != 1){
     stop("Inconsistent input of X, A, and Y. Please check!\n")
   }
-  A.list = list() # stores actions available at each stage
-  for (stage in seq(n.stage)) {
-    A.list = c(A.list, list( sort(unique(A[[stage]])) ))
-  }
 
+  A <- lapply(A, as.factor)
+  A.list <- lapply(A, function(x) sort(unique(x)))
   S.learners <- T.learners <- deC.learners <- NULL
 
   ######==================== bart as baselearner ====================
@@ -111,9 +109,6 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
           }
           if (include.A == 1) { # nothing need to do when include.A == 0
             A.tmp = data.frame(A = A[[stage-1]])
-            for (ii in seq(ncol(A.tmp))) {
-              A.tmp[,ii] <- as.factor(A.tmp[,ii])
-            }
             X.tr = cbind(X.tr, A.tmp)
           } else if (include.A == 2) {
             A.tmp = do.call(cbind.data.frame, A[1:(stage-1)])
@@ -181,9 +176,6 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
           }
           if (include.A == 1) { # nothing need to do when include.A == 0
             A.tmp = data.frame(A = A[[stage-1]])
-            for (ii in seq(ncol(A.tmp))) {
-              A.tmp[,ii] <- as.factor(A.tmp[,ii])
-            }
             X.tr = cbind(X.tr, A.tmp)
           } else if (include.A == 2) {
             A.tmp = do.call(cbind.data.frame, A[1:(stage-1)])
@@ -267,9 +259,6 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
           }
           if (include.A == 1) { # nothing need to do when include.A == 0
             A.tmp = data.frame(A = A[[stage-1]])
-            for (ii in seq(ncol(A.tmp))) {
-              A.tmp[,ii] <- as.factor(A.tmp[,ii])
-            }
             X.tr = cbind(X.tr, A.tmp)
           } else if (include.A == 2) {
             A.tmp = do.call(cbind.data.frame, A[1:(stage-1)])
@@ -336,9 +325,6 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
           }
           if (include.A == 1) { # nothing need to do when include.A == 0
             A.tmp = data.frame(A = A[[stage-1]])
-            for (ii in seq(ncol(A.tmp))) {
-              A.tmp[,ii] <- as.factor(A.tmp[,ii])
-            }
             X.tr = cbind(X.tr, A.tmp)
           } else if (include.A == 2) {
             A.tmp = do.call(cbind.data.frame, A[1:(stage-1)])
@@ -407,9 +393,6 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
           }
           if (include.A == 1) { # nothing need to do when include.A == 0
             A.tmp = data.frame(A = A[[stage-1]])
-            for (ii in seq(ncol(A.tmp))) {
-              A.tmp[,ii] <- as.factor(A.tmp[,ii])
-            }
             X.tr = cbind(X.tr, A.tmp)
           } else if (include.A == 2) {
             A.tmp = do.call(cbind.data.frame, A[1:(stage-1)])

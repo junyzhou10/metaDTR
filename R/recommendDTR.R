@@ -94,6 +94,9 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
           A.new[A.ind] <- A.obs[A.ind]
           if (include.A == 1) { # nothing need to do when include.A == 0
             A.tmp = data.frame(A = A.new[[stage-1]])
+            # for (ii in seq(ncol(A.tmp))) {
+            #   A.tmp[,ii] <- factor(A.tmp[,ii], levels = A.list[[stage-1]])
+            # }
             X.te = cbind(X.te, A.tmp)
           } else if (include.A == 2) {
             A.tmp = do.call(cbind.data.frame, A.new[1:(stage-1)])
@@ -115,7 +118,7 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
         for (ii in A.list[[stage]]) {
           dat.tmp = rbind(dat.tmp, data.frame(trt = ii, X.te))
         }
-        dat.tmp$trt = as.factor(dat.tmp$trt)
+        dat.tmp$trt = factor(dat.tmp$trt, levels = A.list[[stage]])
         if (baseLearner == "BART") {
           Y.pred = colMeans(predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = stats::model.matrix(~trt*.-1, dat.tmp)))
           Y.pred = matrix(Y.pred, ncol = length(A.list[[stage]]), byrow = F)
@@ -151,6 +154,9 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
           A.new[A.ind] <- A.obs[A.ind]
           if (include.A == 1) { # nothing need to do when include.A == 0
             A.tmp = data.frame(A = A.new[[stage-1]])
+            # for (ii in seq(ncol(A.tmp))) {
+            #   A.tmp[,ii] <- factor(A.tmp[,ii], levels = A.list[[stage-1]])
+            # }
             X.te = cbind(X.te, A.tmp)
           } else if (include.A == 2) {
             A.tmp = do.call(cbind.data.frame, A.new[1:(stage-1)])
@@ -212,6 +218,9 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
           A.new[A.ind] <- A.obs[A.ind]
           if (include.A == 1) { # nothing need to do when include.A == 0
             A.tmp = data.frame(A = A.new[[stage-1]])
+            # for (ii in seq(ncol(A.tmp))) {
+            #   A.tmp[,ii] <- factor(A.tmp[,ii], levels = A.list[[stage-1]])
+            # }
             X.te = cbind(X.te, A.tmp)
           } else if (include.A == 2) {
             A.tmp = do.call(cbind.data.frame, A.new[1:(stage-1)])
