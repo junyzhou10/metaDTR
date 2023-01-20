@@ -58,11 +58,7 @@ provide an initial estimate.}
 
 \item{verbose}{Console print allowed?}
 
-\item{...}{Additional arguments that can be passed to \code{dbarts::bart} or \code{glmnet::cv.glmnet}
-If \code{TRUE}, covariates adopted in training at stage \code{T} includes
-\code{X[[t]], t<=T}, \code{A[[t]], t<T}, and \code{Y[[t]], t<T}. In other words,
-\code{X} actually should only store additional covariates at each stage. Note that if
-there are subjects dropping out during the study, it will cause error.}
+\item{...}{Additional arguments that can be passed to \code{dbarts::bart} or \code{glmnet::cv.glmnet}}
 }
 \value{
 It includes learning results, basically, the trained functions that can be used for predictions. Since

@@ -30,10 +30,6 @@
 #'                  provide an initial estimate.
 #' @param verbose Console print allowed?
 #' @param ... Additional arguments that can be passed to \code{dbarts::bart} or \code{glmnet::cv.glmnet}
-#' If \code{TRUE}, covariates adopted in training at stage \code{T} includes
-#'                      \code{X[[t]], t<=T}, \code{A[[t]], t<T}, and \code{Y[[t]], t<T}. In other words,
-#'                      \code{X} actually should only store additional covariates at each stage. Note that if
-#'                      there are subjects dropping out during the study, it will cause error.
 #' @details This function supports to find the optimal dynamic treatment regime (DTR) for either randomized experiments
 #'          or observational studies. Also, thanks to meta-learner structure, S-, T-, and deC-learner can naturally
 #'          support multiple action options at any stage. \cr
@@ -116,10 +112,10 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
             X.tr = cbind(X.tr, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
-            Y.tmp = data.frame(Y = Y[[stage-1]])
+            Y.tmp = data.frame(Y = Y[[stage-1]]); colnames(Y.tmp) <- "y"
             X.tr = cbind(X.tr, Y.tmp)
           } else if (include.Y == 2) {
-            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE)); colnames(Y.tmp) <- paste("y", seq(ncol(Y.tmp)),sep = "_")
             X.tr = cbind(X.tr, Y.tmp)
           }
         }
@@ -184,10 +180,10 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
             X.tr = cbind(X.tr, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
-            Y.tmp = data.frame(Y = Y[[stage-1]])
+            Y.tmp = data.frame(Y = Y[[stage-1]]); colnames(Y.tmp) <- "y"
             X.tr = cbind(X.tr, Y.tmp)
           } else if (include.Y == 2) {
-            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE)); colnames(Y.tmp) <- paste("y", seq(ncol(Y.tmp)),sep = "_")
             X.tr = cbind(X.tr, Y.tmp)
           }
         }
@@ -268,10 +264,10 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
             X.tr = cbind(X.tr, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
-            Y.tmp = data.frame(Y = Y[[stage-1]])
+            Y.tmp = data.frame(Y = Y[[stage-1]]); colnames(Y.tmp) <- "y"
             X.tr = cbind(X.tr, Y.tmp)
           } else if (include.Y == 2) {
-            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE)); colnames(Y.tmp) <- paste("y", seq(ncol(Y.tmp)),sep = "_")
             X.tr = cbind(X.tr, Y.tmp)
           }
         }
@@ -334,10 +330,10 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
             X.tr = cbind(X.tr, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
-            Y.tmp = data.frame(Y = Y[[stage-1]])
+            Y.tmp = data.frame(Y = Y[[stage-1]]); colnames(Y.tmp) <- "y"
             X.tr = cbind(X.tr, Y.tmp)
           } else if (include.Y == 2) {
-            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE)); colnames(Y.tmp) <- paste("y", seq(ncol(Y.tmp)),sep = "_")
             X.tr = cbind(X.tr, Y.tmp)
           }
         }
@@ -402,10 +398,10 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
             X.tr = cbind(X.tr, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
-            Y.tmp = data.frame(Y = Y[[stage-1]])
+            Y.tmp = data.frame(Y = Y[[stage-1]]); colnames(Y.tmp) <- "y"
             X.tr = cbind(X.tr, Y.tmp)
           } else if (include.Y == 2) {
-            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE))
+            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE)); colnames(Y.tmp) <- paste("y", seq(ncol(Y.tmp)),sep = "_")
             X.tr = cbind(X.tr, Y.tmp)
           }
         }

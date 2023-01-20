@@ -105,10 +105,10 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
             X.te = cbind(X.te, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
-            Y.tmp = data.frame(Y = Y.new[[stage-1]])
+            Y.tmp = data.frame(Y = Y.new[[stage-1]]); colnames(Y.tmp) <- "y"
             X.te = cbind(X.te, Y.tmp)
           } else if (include.Y == 2) {
-            Y.tmp = data.frame(Y = matrix(unlist(Y.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
+            Y.tmp = data.frame(Y = matrix(unlist(Y.new[1:(stage-1)]), nrow = n.test, byrow = FALSE)); colnames(Y.tmp) <- paste("y", seq(ncol(Y.tmp)),sep = "_")
             X.te = cbind(X.te, Y.tmp)
           }
         }
@@ -165,10 +165,10 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
             X.te = cbind(X.te, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
-            Y.tmp = data.frame(Y = Y.new[[stage-1]])
+            Y.tmp = data.frame(Y = Y.new[[stage-1]]); colnames(Y.tmp) <- "y"
             X.te = cbind(X.te, Y.tmp)
           } else if (include.Y == 2) {
-            Y.tmp = data.frame(Y = matrix(unlist(Y.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
+            Y.tmp = data.frame(Y = matrix(unlist(Y.new[1:(stage-1)]), nrow = n.test, byrow = FALSE)); colnames(Y.tmp) <- paste("y", seq(ncol(Y.tmp)),sep = "_")
             X.te = cbind(X.te, Y.tmp)
           }
         }
@@ -229,10 +229,10 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
             X.te = cbind(X.te, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
-            Y.tmp = data.frame(Y = Y.new[[stage-1]])
+            Y.tmp = data.frame(Y = Y.new[[stage-1]]); colnames(Y.tmp) <- "y"
             X.te = cbind(X.te, Y.tmp)
           } else if (include.Y == 2) {
-            Y.tmp = data.frame(Y = matrix(unlist(Y.new[1:(stage-1)]), nrow = n.test, byrow = FALSE))
+            Y.tmp = data.frame(Y = matrix(unlist(Y.new[1:(stage-1)]), nrow = n.test, byrow = FALSE)); colnames(Y.tmp) <- paste("y", seq(ncol(Y.tmp)),sep = "_")
             X.te = cbind(X.te, Y.tmp)
           }
         }
