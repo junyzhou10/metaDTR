@@ -16,6 +16,9 @@ The package currently supports S-, T-, and deC-learner. So far, [BART (Chipman 2
 There is an example of code in the appendix of author's [post](https://jzhou.org/posts/optdtr/).
 
 # Limitations
-So far, base learner only supports BART and GAM. For meta-learners, now supports S-, T-, and deC-learner. X-learner will not be included because it is not staightforward in multi-armed cases, and not suitable for outcome types other than continuous. Details of de-centralized learner (deC-learner) will be available after publication.
+So far, base learner only supports BART, random forest (RF), and GAM. For meta-learners, now supports S-, T-, and deC-learner. X-learner will not be included because it is not staightforward in multi-armed cases, and not suitable for outcome types other than continuous. Details of de-centralized learner (deC-learner) will be available after publication.
 
-Also, only continuous outcome type is allowed. 
+Also, only continuous outcome type is allowed at this point. Incorporating binary endpoints with log odds ratio as causal estimand can the next step of work. 
+
+# Lastest Update: 1/23/2023
+- Add random forest as baselearner. Note that RF is suggested to use only when sample size is larger enough, or persuing numerical efficiency. Otherwise, BART is more desirable as baselearner.
