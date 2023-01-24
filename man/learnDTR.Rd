@@ -9,7 +9,7 @@ learnDTR(
   A,
   Y,
   weights = rep(1, length(X)),
-  baseLearner = c("BART", "GAM"),
+  baseLearner = c("RF", "BART", "GAM"),
   metaLearners = c("S", "T", "deC"),
   include.X = 0,
   include.A = 0,
@@ -36,9 +36,10 @@ information.}
 
 \item{weights}{Weights on each stage of rewards. Default is all 1.}
 
-\item{baseLearner}{Choose one baselearner for meta-learn er algorithms. So far supports \code{BART} and
-\code{GAM} through package \code{glmnet}, which can provide variable selection by
-regularization.}
+\item{baseLearner}{Choose one baselearner for meta-learn er algorithms. So far, it supports \code{BART} by
+package \code{dbarts}, \code{RF} (random forests) by \code{ranger}, and \code{GAM}
+through package \code{glmnet}, which can provide variable selection/sparsity by
+various type of regularizations. So more in details.}
 
 \item{metaLearners}{\code{c("S", "T", "deC")}. Meta-learner algorithms to learn the optimal DTR. To support more than two actions
 at each stage, S-, A-, and deC-learner are available. But deC-learner only works when
@@ -58,7 +59,7 @@ provide an initial estimate.}
 
 \item{verbose}{Console print allowed?}
 
-\item{...}{Additional arguments that can be passed to \code{dbarts::bart} or \code{glmnet::cv.glmnet}}
+\item{...}{Additional arguments that can be passed to \code{dbarts::bart}, \code{ranger::ranger}, or \code{glmnet::cv.glmnet}}
 }
 \value{
 It includes learning results, basically, the trained functions that can be used for predictions. Since
@@ -77,14 +78,16 @@ support multiple action options at any stage. \cr
 \cr
 For \code{GAM}, the algorithm will not automatically project the covariates \code{X} or outcomes/rewards
 \code{Y} onto any bases-spanned spaces. User shall transform the covariates and/or  outcomes/rewards
-manually and then input the desired design matrix through inputs \code{X} and/or \code{Y}.
+manually and then input the desired design matrix through inputs \code{X} and/or \code{Y}.\cr
+\cr
+It is strongly suggested to adopt BART over random forests as baselearner if sample size is small.
 }
 \examples{
 ## this is the sample adopted in:
 ## https://jzhou.org/posts/optdtr/#case-1-random-assignment-with-two-treatment-options
-DTRs = learnDTR(X = TwoStg_Dat$X,
-                A = TwoStg_Dat$A,
-                Y = TwoStg_Dat$Y,
+DTRs = learnDTR(X = ThreeStg_Dat$X,
+                A = ThreeStg_Dat$A,
+                Y = ThreeStg_Dat$Y,
                 weights = rep(1, 3),
                 baseLearner  = c("BART"),
                 metaLearners = c("S", "T"),

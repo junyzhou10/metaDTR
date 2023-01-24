@@ -23,6 +23,19 @@
 #' @examples
 #' ## To see details of applying this function to obtain optimal DTR on new dataset, please
 #' ##   refer to author's post: https://jzhou.org/posts/optdtr/
+#' ## In this very special case, since covariates X are independent of previous A and Y,
+#' ## the optimal DTR can be found at beginning with following code:
+#' DTRs = learnDTR(X = ThreeStg_Dat$X,
+#'                 A = ThreeStg_Dat$A,
+#'                 Y = ThreeStg_Dat$Y,
+#'                 weights = rep(1, 3),
+#'                 baseLearner  = c("RF"),
+#'                 metaLearners = c("S"),
+#'                 include.X = 1,
+#'                 include.A = 2,
+#'                 include.Y = 0)
+#' optDTR <- recommendDTR(DTRs, currentDTRs = NULL,
+#'                        X.new = ThreeStg_Dat$X.test)
 #' @export
 #' @seealso \code{\link{learnDTR}}
 
@@ -72,8 +85,8 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
 
 
 
-  ######==================== bart/gam as base learner ====================
-  if (baseLearner %in% c("BART", "GAM")) {
+  ######==================== bart/rf/gam as base learner ====================
+  if (baseLearner %in% c("BART", "GAM", "RF")) {
     ######============  S-learner  ============
     if ("S" %in% metaLearners) {
       for (stage in seq(start, n.step, by = 1)) { # forward now
@@ -122,6 +135,10 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
         if (baseLearner == "BART") {
           Y.pred = colMeans(predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = stats::model.matrix(~trt*.-1, dat.tmp)))
           Y.pred = matrix(Y.pred, ncol = length(A.list[[stage]]), byrow = F)
+        }
+        if (baseLearner == "RF") {
+          Y.pred = matrix(predict(DTRs$S.learners[[n.stage - stage + 1]], data = data.frame(stats::model.matrix(~trt*.-1, dat.tmp)))$predictions,
+                          ncol = length(A.list[[stage]]), byrow = F)
         }
         if (baseLearner == "GAM") {
           Y.pred = matrix(predict(DTRs$S.learners[[n.stage - stage + 1]], newx = stats::model.matrix(~trt*.-1, dat.tmp),
@@ -180,6 +197,9 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
             Y.pred = cbind(Y.pred, predict(DTRs$T.learners[[n.stage - stage + 1]][[ii]], newx = stats::model.matrix(~.-1, X.te),
                                            type = "response", s = "lambda.min"))
           }
+          if (baseLearner == "RF") {
+            Y.pred = cbind(Y.pred, predict(DTRs$T.learners[[n.stage - stage + 1]][[ii]], data = data.frame(X.te))$predictions)
+          }
           if (baseLearner == "BART") {
             Y.pred = cbind(Y.pred, colMeans(predict(DTRs$T.learners[[n.stage - stage + 1]][[ii]], newdata = X.te)))
           }
@@ -195,6 +215,10 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
 
     ######============  deC-learner  ============
     if ("deC" %in% metaLearners) {
+      if (baseLearner %in% c("GAM")) {
+        stop("Only GAM supports deC-learner so far! Please use it as baseLearner.")
+      }
+
       for (stage in seq(start, n.step, by = 1)) {
         n.test = nrow(X.new[[stage]])
         # generate simplex coordinates

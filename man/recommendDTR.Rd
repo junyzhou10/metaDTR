@@ -40,6 +40,19 @@ at that stage.
 \examples{
 ## To see details of applying this function to obtain optimal DTR on new dataset, please
 ##   refer to author's post: https://jzhou.org/posts/optdtr/
+## In this very special case, since covariates X are independent of previous A and Y,
+## the optimal DTR can be found at beginning with following code:
+DTRs = learnDTR(X = ThreeStg_Dat$X,
+                A = ThreeStg_Dat$A,
+                Y = ThreeStg_Dat$Y,
+                weights = rep(1, 3),
+                baseLearner  = c("RF"),
+                metaLearners = c("S"),
+                include.X = 1,
+                include.A = 2,
+                include.Y = 0)
+optDTR <- recommendDTR(DTRs, currentDTRs = NULL,
+                       X.new = ThreeStg_Dat$X.test)
 }
 \seealso{
 \code{\link{learnDTR}}

@@ -14,9 +14,10 @@
 #' @param Y A list of outcomes observed in the sequential studies. The order should match with that of \code{X}.
 #'          \code{Y[[t]]} is suppose to be driven by the \code{X[[t]]} and action \code{A[[t]]}.
 #' @param weights Weights on each stage of rewards. Default is all 1.
-#' @param baseLearner Choose one baselearner for meta-learn er algorithms. So far supports \code{BART} and
-#'                    \code{GAM} through package \code{glmnet}, which can provide variable selection by
-#'                    regularization.
+#' @param baseLearner Choose one baselearner for meta-learn er algorithms. So far, it supports \code{BART} by
+#'                    package \code{dbarts}, \code{RF} (random forests) by \code{ranger}, and \code{GAM}
+#'                    through package \code{glmnet}, which can provide variable selection/sparsity by
+#'                    various type of regularizations. So more in details.
 #' @param metaLearners \code{c("S", "T", "deC")}. Meta-learner algorithms to learn the optimal DTR. To support more than two actions
 #'                     at each stage, S-, A-, and deC-learner are available. But deC-learner only works when
 #'                     \code{baseLearner = "GAM"} so far.
@@ -29,14 +30,16 @@
 #'                  surface separately, or algorithm experience some trouble in getting sigma, use this argument to
 #'                  provide an initial estimate.
 #' @param verbose Console print allowed?
-#' @param ... Additional arguments that can be passed to \code{dbarts::bart} or \code{glmnet::cv.glmnet}
+#' @param ... Additional arguments that can be passed to \code{dbarts::bart}, \code{ranger::ranger}, or \code{glmnet::cv.glmnet}
 #' @details This function supports to find the optimal dynamic treatment regime (DTR) for either randomized experiments
 #'          or observational studies. Also, thanks to meta-learner structure, S-, T-, and deC-learner can naturally
 #'          support multiple action options at any stage. \cr
 #'          \cr
 #'          For \code{GAM}, the algorithm will not automatically project the covariates \code{X} or outcomes/rewards
 #'          \code{Y} onto any bases-spanned spaces. User shall transform the covariates and/or  outcomes/rewards
-#'          manually and then input the desired design matrix through inputs \code{X} and/or \code{Y}.
+#'          manually and then input the desired design matrix through inputs \code{X} and/or \code{Y}.\cr
+#'          \cr
+#'          It is strongly suggested to adopt BART over random forests as baselearner if sample size is small.
 #'
 #' @return It includes learning results, basically, the trained functions that can be used for predictions. Since
 #'         sequential recommendations might require intermediate observations, [learnDTR] will not automatically
@@ -45,16 +48,16 @@
 #' @examples
 #' ## this is the sample adopted in:
 #' ## https://jzhou.org/posts/optdtr/#case-1-random-assignment-with-two-treatment-options
-#' DTRs = learnDTR(X = TwoStg_Dat$X,
-#'                 A = TwoStg_Dat$A,
-#'                 Y = TwoStg_Dat$Y,
+#' DTRs = learnDTR(X = ThreeStg_Dat$X,
+#'                 A = ThreeStg_Dat$A,
+#'                 Y = ThreeStg_Dat$Y,
 #'                 weights = rep(1, 3),
 #'                 baseLearner  = c("BART"),
 #'                 metaLearners = c("S", "T"),
 #'                 include.X = 1,
 #'                 include.A = 2,
 #'                 include.Y = 0)
-#' @import stats utils dbarts glmnet
+#' @import stats utils dbarts glmnet ranger
 #' @references
 #' Künzel, Sören R., Jasjeet S. Sekhon, Peter J. Bickel, and Bin Yu.
 #' "Metalearners for estimating heterogeneous treatment effects using machine learning."
@@ -66,7 +69,7 @@
 #' @seealso \code{\link{recommendDTR}}
 
 learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
-                     baseLearner  = c("BART", "GAM"),
+                     baseLearner  = c("RF", "BART", "GAM"),
                      metaLearners = c("S", "T", "deC"),
                      include.X = 0, include.A = 0, include.Y = 0,
                      est.sigma = NULL,
@@ -135,7 +138,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         dat.train = dat.S[1:n.train,]; dat.test = dat.S[-(1:n.train),]
         ## train by bart:
         S.fit = bart(x.train = dat.train, y.train = V.est, keeptrainfits = F,
-                     ntree = 200, keeptrees = TRUE, verbose = FALSE, ...)
+                     keeptrees = TRUE, verbose = FALSE, ...)
         S.est = matrix(colMeans(predict(S.fit, newdata = dat.test)), ncol = length(K.grp), byrow = F)
         ## KEY: update V.est properly
         V.est = apply(S.est, 1, max)
@@ -208,7 +211,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
           #                  ntree = 200L, keeptrainfits = FALSE, ...)
           ## if fit by dbarts
           T.fit = bart(x.train = X.tr[A.tr==ii,], y.train = V.est[A.tr==ii], keeptrainfits = F,
-                       ntree = 200, keeptrees = TRUE, verbose = FALSE,
+                       keeptrees = TRUE, verbose = FALSE,
                        sigest = est.sigma,
                        ...)
           T.est = cbind(T.est, colMeans(predict(T.fit, newdata = X.tr ) ) )
@@ -230,6 +233,143 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
       }
     }
   }
+
+
+
+  ######==================== random forests as baselearner ====================
+  if (baseLearner[1] == "RF") {
+    ######============  S-learner  ============
+    if ("S" %in% metaLearners) {
+      V.est = 0; S.learners = list()
+      for (stage in seq(n.stage, by = -1)) {
+        if (verbose) {
+          print(paste0(Sys.time(), " @Stage(RF/S-): ", stage))
+        }
+
+        n.train = nrow(X[[stage]])
+        ## construct training dataset
+        if (stage == 1) {
+          X.tr = data.frame(X = X[[stage]])
+        } else {
+          ## note the sequence of X, A, Y
+          if (include.X == 1) {
+            X.tr = data.frame(X = matrix(unlist(X[1:stage]), nrow = n.train, byrow = FALSE))
+          } else {
+            X.tr = data.frame(X = X[[stage]])
+          }
+          if (include.A == 1) { # nothing need to do when include.A == 0
+            A.tmp = data.frame(A = A[[stage-1]])
+            X.tr = cbind(X.tr, A.tmp)
+          } else if (include.A == 2) {
+            A.tmp = do.call(cbind.data.frame, A[1:(stage-1)])
+            colnames(A.tmp) <- paste("A", 1:(stage-1), sep = ".")
+            X.tr = cbind(X.tr, A.tmp)
+          }
+          if (include.Y == 1) { # nothing need to do when include.Y == 0
+            Y.tmp = data.frame(Y = Y[[stage-1]]); colnames(Y.tmp) <- "y"
+            X.tr = cbind(X.tr, Y.tmp)
+          } else if (include.Y == 2) {
+            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE)); colnames(Y.tmp) <- paste("y", seq(ncol(Y.tmp)),sep = "_")
+            X.tr = cbind(X.tr, Y.tmp)
+          }
+        }
+
+        A.tr = A[[stage]]
+        Y.tr = Y[[stage]]
+        K.grp = sort(unique(A.tr))
+        V.est = V.est + Y.tr*weights[stage]
+        ## generate data set for S-learner:
+        dat.tmp = data.frame(trt = A.tr, X.tr)
+        for (ii in K.grp) {
+          tmp = data.frame(trt = ii, X.tr)
+          dat.tmp = rbind(dat.tmp, tmp)
+        }
+        dat.tmp$trt = as.factor(dat.tmp$trt)
+        dat.S = stats::model.matrix(~trt*.-1, dat.tmp)
+        dat.train = dat.S[1:n.train,]; dat.test = dat.S[-(1:n.train),]
+        ## train by bart:
+        S.fit = ranger(V~., data = data.frame(V = V.est, dat.train), ...)
+        S.est = matrix(predict(S.fit, data = data.frame(dat.test))$predictions, ncol = length(K.grp), byrow = F)
+        ## KEY: update V.est properly
+        V.est = apply(S.est, 1, max)
+        ## clean some memory:
+        remove("S.est", "dat.train", "dat.test")
+        ## Store the trained learners
+        S.learners = c(S.learners, list(S.fit))
+        remove("S.fit")
+        gc(verbose = FALSE)
+      }
+      names(S.learners) <- paste("S", seq(n.stage, by = -1), sep = ".")
+      if (verbose) {
+        print(paste0(Sys.time(), ": S-learner training (RF) done!!"))
+      }
+    }
+
+    ######============  T-learner  ============
+    if ("T" %in% metaLearners) {
+      V.est = 0; T.learners = list()
+      for (stage in seq(n.stage, by = -1)) {
+        if (verbose) {
+          print(paste0(Sys.time(), " @Stage(RF/T-): ", stage))
+        }
+        n.train = nrow(X[[stage]])
+        ## construct training dataset
+        if (stage == 1) {
+          X.tr = data.frame(X = X[[stage]])
+        } else {
+          ## note the sequence of X, A, Y
+          if (include.X == 1) {
+            X.tr = data.frame(X = matrix(unlist(X[1:stage]), nrow = n.train, byrow = FALSE))
+          } else {
+            X.tr = data.frame(X = X[[stage]])
+          }
+          if (include.A == 1) { # nothing need to do when include.A == 0
+            A.tmp = data.frame(A = A[[stage-1]])
+            X.tr = cbind(X.tr, A.tmp)
+          } else if (include.A == 2) {
+            A.tmp = do.call(cbind.data.frame, A[1:(stage-1)])
+            colnames(A.tmp) <- paste("A", 1:(stage-1), sep = ".")
+            X.tr = cbind(X.tr, A.tmp)
+          }
+          if (include.Y == 1) { # nothing need to do when include.Y == 0
+            Y.tmp = data.frame(Y = Y[[stage-1]]); colnames(Y.tmp) <- "y"
+            X.tr = cbind(X.tr, Y.tmp)
+          } else if (include.Y == 2) {
+            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE)); colnames(Y.tmp) <- paste("y", seq(ncol(Y.tmp)),sep = "_")
+            X.tr = cbind(X.tr, Y.tmp)
+          }
+        }
+        A.tr = A[[stage]]
+        Y.tr = Y[[stage]]
+        K.grp = sort(unique(A.tr))
+        n.train = nrow(X.tr)
+        V.est = V.est + Y.tr*weights[stage]
+        ## directly train T-learner with bart:
+        T.est = NULL; T.stage = list();
+
+        for (ii in K.grp) {
+          T.fit = ranger(V~., data = data.frame(V = V.est, X.tr)[A.tr==ii,], ...)
+          T.est = cbind(T.est, predict(T.fit, data = data.frame(X.tr))$predictions)
+          T.stage = c(T.stage, list(T.fit))
+          gc(verbose = FALSE)
+        }
+        ## KEY: update V.est properly
+        V.est = apply(T.est, 1, max)
+        ## clean some memory:
+        remove("T.fit", "T.est", "X.tr")
+        ## Store the trained learners
+        names(T.stage) <- paste("A", K.grp, sep = ".")
+        T.learners = c(T.learners, list(T.stage))
+      }
+      names(T.learners) <- paste("T", seq(n.stage, by = -1), sep = ".")
+      if (verbose) {
+        print(paste0(Sys.time(), ": T-learner training (RF) done!!"))
+      }
+    }
+  }
+
+
+
 
 
 
