@@ -12,7 +12,7 @@
 #'   \item X.test Test dataset
 #' }
 #' @docType data
-#' @name TwoStg_Dat
+#' @name ThreeStg_Dat
 #' @format A list of X, Y, and A. Each element further contains a list of three element for three stages.
 #'
 "ThreeStg_Dat"
