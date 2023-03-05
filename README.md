@@ -12,7 +12,7 @@ To install the package:
 devtools::install_github("junyzhou10/metaDTR")
 ```
 
-The package currently supports S-, T-, and deC-learner. So far, [BART (Chipman 2010)](https://projecteuclid.org/journals/annals-of-applied-statistics/volume-4/issue-1/BART-Bayesian-additive-regression-trees/10.1214/09-AOAS285.full) and [GAM (Hastie 2017)](https://www.taylorfrancis.com/chapters/edit/10.1201/9780203738535-7/generalized-additive-models-trevor-hastie) is available as baselearner. 
+The package currently supports S-, T-, and deC-learner. So far, random forest, [XGBoost](https://xgboost.readthedocs.io/en/stable/), [BART (Chipman 2010)](https://projecteuclid.org/journals/annals-of-applied-statistics/volume-4/issue-1/BART-Bayesian-additive-regression-trees/10.1214/09-AOAS285.full) and [GAM (Hastie 2017)](https://www.taylorfrancis.com/chapters/edit/10.1201/9780203738535-7/generalized-additive-models-trevor-hastie) are available as baselearner. 
 There is an example of code in the appendix of author's [post](https://jzhou.org/posts/optdtr/).
 
 # Limitations
@@ -20,5 +20,8 @@ So far, base learner only supports BART, random forest (RF), and GAM. For meta-l
 
 Also, only continuous outcome type is allowed at this point. Incorporating binary endpoints with log odds ratio as causal estimand can the next step of work. 
 
-# Lastest Update: 1/23/2023
+# Update: 3/05/2023
+- Add XGBoost as baselearner. 
+
+# Update: 1/23/2023
 - Add random forest as baselearner. Note that RF is suggested to use only when sample size is larger enough, or persuing numerical efficiency. Otherwise, BART is more desirable as baselearner.
