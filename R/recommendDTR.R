@@ -86,7 +86,7 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
 
 
   ######==================== bart/rf/gam as base learner ====================
-  if (baseLearner %in% c("BART", "GAM", "RF")) {
+  if (baseLearner %in% c("BART", "GAM", "RF", "XGBoost")) {
     ######============  S-learner  ============
     if ("S" %in% metaLearners) {
       for (stage in seq(start, n.step, by = 1)) { # forward now
@@ -135,6 +135,10 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
         if (baseLearner == "BART") {
           Y.pred = colMeans(predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = stats::model.matrix(~trt*.-1, dat.tmp)))
           Y.pred = matrix(Y.pred, ncol = length(A.list[[stage]]), byrow = F)
+        }
+        if (baseLearner == "XGBoost") {
+          Y.pred = matrix(predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp))),
+                          ncol = length(A.list[[stage]]), byrow = F)
         }
         if (baseLearner == "RF") {
           Y.pred = matrix(predict(DTRs$S.learners[[n.stage - stage + 1]], data = data.frame(stats::model.matrix(~trt*.-1, dat.tmp)))$predictions,
@@ -202,6 +206,9 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
           }
           if (baseLearner == "BART") {
             Y.pred = cbind(Y.pred, colMeans(predict(DTRs$T.learners[[n.stage - stage + 1]][[ii]], newdata = X.te)))
+          }
+          if (baseLearner == "XGBoost") {
+            Y.pred = cbind(Y.pred, predict(DTRs$T.learners[[n.stage - stage + 1]][[ii]], newdata = xgb.DMatrix(data = stats::model.matrix(~.-1, X.te))))
           }
         }
         A.pred = A.list[[stage]][apply(Y.pred, 1, which.max)]
@@ -272,6 +279,8 @@ recommendDTR <- function(DTRs, currentDTRs = NULL,
 
 
 
+  } else {
+    warning("Please choose a proper base-learner!\n")
   }
 
 

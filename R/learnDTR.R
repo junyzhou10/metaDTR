@@ -15,9 +15,10 @@
 #'          \code{Y[[t]]} is suppose to be driven by the \code{X[[t]]} and action \code{A[[t]]}.
 #' @param weights Weights on each stage of rewards. Default is all 1.
 #' @param baseLearner Choose one baselearner for meta-learn er algorithms. So far, it supports \code{BART} by
-#'                    package \code{dbarts}, \code{RF} (random forests) by \code{ranger}, and \code{GAM}
+#'                    package \code{dbarts}, \code{RF} (random forests) by \code{ranger}, \code{XGBoost} by
+#'                    package \code{xgboost}, and \code{GAM} (generalized additive model)
 #'                    through package \code{glmnet}, which can provide variable selection/sparsity by
-#'                    various type of regularizations. So more in details.
+#'                    various type of regularization. So more in details.
 #' @param metaLearners \code{c("S", "T", "deC")}. Meta-learner algorithms to learn the optimal DTR. To support more than two actions
 #'                     at each stage, S-, A-, and deC-learner are available. But deC-learner only works when
 #'                     \code{baseLearner = "GAM"} so far.
@@ -30,7 +31,8 @@
 #'                  surface separately, or algorithm experience some trouble in getting sigma, use this argument to
 #'                  provide an initial estimate.
 #' @param verbose Console print allowed?
-#' @param ... Additional arguments that can be passed to \code{dbarts::bart}, \code{ranger::ranger}, or \code{glmnet::cv.glmnet}
+#' @param ... Additional arguments that can be passed to \code{dbarts::bart}, \code{ranger::ranger},
+#'            \code{params} of \code{xbgoost::xgb.cv}, or \code{glmnet::cv.glmnet}
 #' @details This function supports to find the optimal dynamic treatment regime (DTR) for either randomized experiments
 #'          or observational studies. Also, thanks to meta-learner structure, S-, T-, and deC-learner can naturally
 #'          support multiple action options at any stage. \cr
@@ -57,7 +59,7 @@
 #'                 include.X = 1,
 #'                 include.A = 2,
 #'                 include.Y = 0)
-#' @import stats utils dbarts glmnet ranger
+#' @import stats utils dbarts glmnet ranger xgboost
 #' @references
 #' Künzel, Sören R., Jasjeet S. Sekhon, Peter J. Bickel, and Bin Yu.
 #' "Metalearners for estimating heterogeneous treatment effects using machine learning."
@@ -69,7 +71,7 @@
 #' @seealso \code{\link{recommendDTR}}
 
 learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
-                     baseLearner  = c("RF", "BART", "GAM"),
+                     baseLearner  = c("RF", "BART", "XGBoost", "GAM"),
                      metaLearners = c("S", "T", "deC"),
                      include.X = 0, include.A = 0, include.Y = 0,
                      est.sigma = NULL,
@@ -80,19 +82,34 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
   if (length(unique(length(X), length(A), length(Y))) != 1){
     stop("Inconsistent input of X, A, and Y. Please check!\n")
   }
+  ######==================== clean arguments in ... ====================
+  if (baseLearner[1] == "XGBoost") {
+    params = list(...)
+    params.list = params[!names(params) %in% c(names(as.list(args(xgb.cv))), names(as.list(args(xgb.train))))]
+    params.cv.tr = params[names(params) %in% c(names(as.list(args(xgb.cv))), names(as.list(args(xgb.train))))]
+    # default settings for XGBoost
+    params.default <- list(booster = "gbtree", objective = "reg:squarederror",
+                   eta=0.2, gamma=0, max_depth=5,
+                   min_child_weight=1, subsample=2/(sqrt(5)+1), colsample_bytree=2/(sqrt(5)+1),
+                   lambda = 0, alpha = 1)
+    params.list = c(params.list, params.default[names(params.default)[!names(params.default) %in% names(params.list)]])
+  }
+
+
+
 
   A <- lapply(A, as.factor)
   A.list <- lapply(A, function(x) sort(unique(x)))
   S.learners <- T.learners <- deC.learners <- NULL
 
-  ######==================== bart as baselearner ====================
-  if (baseLearner[1] == "BART") {
+  ######==================== bart/xgboost as baselearner ====================
+  if (baseLearner[1] %in% c("BART", "XGBoost")) {
     ######============  S-learner  ============
     if ("S" %in% metaLearners) {
       V.est = 0; S.learners = list()
       for (stage in seq(n.stage, by = -1)) {
         if (verbose) {
-          print(paste0(Sys.time(), " @Stage(BART/S-): ", stage))
+          print(paste0(Sys.time(), " @Stage(", baseLearner[1], "/S-): ", stage))
         }
 
         n.train = nrow(X[[stage]])
@@ -136,23 +153,40 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         dat.tmp$trt = as.factor(dat.tmp$trt)
         dat.S = stats::model.matrix(~trt*.-1, dat.tmp)
         dat.train = dat.S[1:n.train,]; dat.test = dat.S[-(1:n.train),]
-        ## train by bart:
-        S.fit = bart(x.train = dat.train, y.train = V.est, keeptrainfits = F,
-                     keeptrees = TRUE, verbose = FALSE, ...)
-        S.est = matrix(colMeans(predict(S.fit, newdata = dat.test)), ncol = length(K.grp), byrow = F)
+        ## train by bart/xgboost:
+        if (baseLearner[1] == "BART") {
+          S.fit = bart(x.train = dat.train, y.train = V.est, keeptrainfits = F,
+                       keeptrees = TRUE, verbose = FALSE, ...)
+          S.est = matrix(colMeans(predict(S.fit, newdata = dat.test)), ncol = length(K.grp), byrow = F)
+        }
+        if (baseLearner[1] == "XGBoost") {
+          dtrain <- xgb.DMatrix(data = dat.train, label = V.est)
+          dtest <- xgb.DMatrix(data = dat.test)
+          xgbcv <- xgb.cv( params = params.list, data = dtrain,
+                           nrounds = ifelse("nrounds" %in% names(params.cv.tr), params.cv.tr[['nrounds']], 500),
+                           nfold = ifelse("nfold" %in% names(params.cv.tr), params.cv.tr[['nfold']], 5),
+                           stratified = ifelse("stratified" %in% names(params.cv.tr), params.cv.tr[['stratified']], FALSE),
+                           early_stopping_rounds = ifelse("early_stopping_rounds" %in% names(params.cv.tr), params.cv.tr[['early_stopping_rounds']], 10),
+                           showsd = FALSE, print_every_n = 10, maximize = F, verbose = FALSE # no use at all
+                           )
+          S.fit = xgb.train( params = params.list, data = dtrain, nrounds = xgbcv$best_iteration,
+                             watchlist = list(train=dtrain),
+                             eval_metric = ifelse("eval_metric" %in% names(params.cv.tr), params.cv.tr[['eval_metric']], 'rmse'),
+                             maximize = F, verbose = FALSE)
+          S.est = matrix(predict(S.fit, dtest), ncol = length(K.grp), byrow = F)
+        }
         ## KEY: update V.est properly
         V.est = apply(S.est, 1, max)
         ## clean some memory:
         remove("S.est", "dat.train", "dat.test")
         ## Store the trained learners
-        invisible(S.fit$fit$state)
         S.learners = c(S.learners, list(S.fit))
         remove("S.fit")
         gc(verbose = FALSE)
       }
       names(S.learners) <- paste("S", seq(n.stage, by = -1), sep = ".")
       if (verbose) {
-        print(paste0(Sys.time(), ": S-learner training (BART) done!!"))
+        print(paste0(Sys.time(), ": S-learner training (", baseLearner[1], ") done!!"))
       }
     }
 
@@ -161,7 +195,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
       V.est = 0; T.learners = list()
       for (stage in seq(n.stage, by = -1)) {
         if (verbose) {
-          print(paste0(Sys.time(), " @Stage(BART/T-): ", stage))
+          print(paste0(Sys.time(), " @Stage(", baseLearner[1], "/T-): ", stage))
         }
         n.train = nrow(X[[stage]])
         ## construct training dataset
@@ -199,23 +233,42 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         T.est = NULL; T.stage = list();
 
         for (ii in K.grp) {
-          if (is.null(est.sigma)) {
-            if (as.numeric(table(A.tr)[paste(ii)]) < 1.05*ncol(X.tr)) {# in case n<p
-              est.sigma = 1
-            } else {
-              est.sigma = NA
+          if (baseLearner[1] == "BART") {
+            if (is.null(est.sigma)) {
+              if (as.numeric(table(A.tr)[paste(ii)]) < 1.05*ncol(X.tr)) {# in case n<p
+                est.sigma = 1
+              } else {
+                est.sigma = NA
+              }
             }
+            ## if use BART package rather than dbarts
+            # T.fit = mc.wbart(x.train = X.tr[A.tr==ii,], y.train = V.est[A.tr==ii],
+            #                  ntree = 200L, keeptrainfits = FALSE, ...)
+            ## if fit by dbarts
+            T.fit = bart(x.train = X.tr[A.tr==ii,], y.train = V.est[A.tr==ii], keeptrainfits = F,
+                         keeptrees = TRUE, verbose = FALSE,
+                         sigest = est.sigma,
+                         ...)
+            T.est = cbind(T.est, colMeans(predict(T.fit, newdata = X.tr ) ) )
           }
-          ## if use BART package rather than dbarts
-          # T.fit = mc.wbart(x.train = X.tr[A.tr==ii,], y.train = V.est[A.tr==ii],
-          #                  ntree = 200L, keeptrainfits = FALSE, ...)
-          ## if fit by dbarts
-          T.fit = bart(x.train = X.tr[A.tr==ii,], y.train = V.est[A.tr==ii], keeptrainfits = F,
-                       keeptrees = TRUE, verbose = FALSE,
-                       sigest = est.sigma,
-                       ...)
-          T.est = cbind(T.est, colMeans(predict(T.fit, newdata = X.tr ) ) )
-          invisible(T.fit$fit$state)
+
+          if (baseLearner[1] == "XGBoost") {
+            dtrain <- xgb.DMatrix(data = stats::model.matrix(~.-1, X.tr[A.tr==ii,]), label = V.est[A.tr==ii]) # data.frame is not supported
+            dtest <- xgb.DMatrix(data = stats::model.matrix(~.-1, X.tr))
+            xgbcv <- xgb.cv( params = params.list, data = dtrain,
+                             nrounds = ifelse("nrounds" %in% names(params.cv.tr), params.cv.tr[['nrounds']], 500),
+                             nfold = ifelse("nfold" %in% names(params.cv.tr), params.cv.tr[['nfold']], 5),
+                             stratified = ifelse("stratified" %in% names(params.cv.tr), params.cv.tr[['stratified']], FALSE),
+                             early_stopping_rounds = ifelse("early_stopping_rounds" %in% names(params.cv.tr), params.cv.tr[['early_stopping_rounds']], 10),
+                             showsd = FALSE, print_every_n = 10, maximize = F, verbose = FALSE # no use at all
+            )
+            T.fit = xgb.train( params = params.list, data = dtrain, nrounds = xgbcv$best_iteration,
+                               watchlist = list(train=dtrain),
+                               eval_metric = ifelse("eval_metric" %in% names(params.cv.tr), params.cv.tr[['eval_metric']], 'rmse'),
+                               maximize = F, verbose = FALSE)
+            T.est = cbind(T.est, predict(T.fit, dtest))
+          }
+
           T.stage = c(T.stage, list(T.fit))
           gc(verbose = FALSE)
         }
@@ -229,7 +282,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
       }
       names(T.learners) <- paste("T", seq(n.stage, by = -1), sep = ".")
       if (verbose) {
-        print(paste0(Sys.time(), ": T-learner training (BART) done!!"))
+        print(paste0(Sys.time(), ": T-learner training (", baseLearner[1], ") done!!"))
       }
     }
   }
@@ -287,7 +340,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         dat.tmp$trt = as.factor(dat.tmp$trt)
         dat.S = stats::model.matrix(~trt*.-1, dat.tmp)
         dat.train = dat.S[1:n.train,]; dat.test = dat.S[-(1:n.train),]
-        ## train by bart:
+        ## train by ranger:
         S.fit = ranger(V~., data = data.frame(V = V.est, dat.train), ...)
         S.est = matrix(predict(S.fit, data = data.frame(dat.test))$predictions, ncol = length(K.grp), byrow = F)
         ## KEY: update V.est properly
@@ -344,7 +397,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         K.grp = sort(unique(A.tr))
         n.train = nrow(X.tr)
         V.est = V.est + Y.tr*weights[stage]
-        ## directly train T-learner with bart:
+        ## directly train T-learner with ranger:
         T.est = NULL; T.stage = list();
 
         for (ii in K.grp) {

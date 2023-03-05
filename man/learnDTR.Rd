@@ -9,7 +9,7 @@ learnDTR(
   A,
   Y,
   weights = rep(1, length(X)),
-  baseLearner = c("RF", "BART", "GAM"),
+  baseLearner = c("RF", "BART", "XGBoost", "GAM"),
   metaLearners = c("S", "T", "deC"),
   include.X = 0,
   include.A = 0,
@@ -37,9 +37,10 @@ information.}
 \item{weights}{Weights on each stage of rewards. Default is all 1.}
 
 \item{baseLearner}{Choose one baselearner for meta-learn er algorithms. So far, it supports \code{BART} by
-package \code{dbarts}, \code{RF} (random forests) by \code{ranger}, and \code{GAM}
+package \code{dbarts}, \code{RF} (random forests) by \code{ranger}, \code{XGBoost} by
+package \code{xgboost}, and \code{GAM} (generalized additive model)
 through package \code{glmnet}, which can provide variable selection/sparsity by
-various type of regularizations. So more in details.}
+various type of regularization. So more in details.}
 
 \item{metaLearners}{\code{c("S", "T", "deC")}. Meta-learner algorithms to learn the optimal DTR. To support more than two actions
 at each stage, S-, A-, and deC-learner are available. But deC-learner only works when
@@ -59,7 +60,8 @@ provide an initial estimate.}
 
 \item{verbose}{Console print allowed?}
 
-\item{...}{Additional arguments that can be passed to \code{dbarts::bart}, \code{ranger::ranger}, or \code{glmnet::cv.glmnet}}
+\item{...}{Additional arguments that can be passed to \code{dbarts::bart}, \code{ranger::ranger},
+\code{params} of \code{xbgoost::xgb.cv}, or \code{glmnet::cv.glmnet}}
 }
 \value{
 It includes learning results, basically, the trained functions that can be used for predictions. Since
