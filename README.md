@@ -20,8 +20,11 @@ So far, base learner only supports BART, random forest (RF), and GAM. For meta-l
 
 Also, only continuous outcome type is allowed at this point. Incorporating binary endpoints with log odds ratio as causal estimand can the next step of work. 
 
-# Update: 3/05/2023
+# Update: 04/01/2023
+- Allow continuous treatment/action values. Not wrapped together yet. Please use function `learnDTR.cont()` for learning data with continuous outcomes and `recommendDTR.cont()` for recommendation given new dataset. 
+
+# Update: 03/05/2023
 - Add XGBoost as baselearner. 
 
-# Update: 1/23/2023
+# Update: 01/23/2023
 - Add random forest as baselearner. Note that RF is suggested to use only when sample size is larger enough, or persuing numerical efficiency. Otherwise, BART is more desirable as baselearner.
