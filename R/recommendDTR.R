@@ -1,4 +1,4 @@
-#' @title Recommend the optimal treatment at each stage
+#' @title Recommend the optimal treatment at each stage (Categorical Treatment)
 #' @author Junyi Zhou \email{junyzhou@iu.edu}
 #' @description This function make recommendations of optimal treatment for a given subject at given stage
 #' @param DTRs Output from [learnDTR()] that belong to class \code{metaDTR}.

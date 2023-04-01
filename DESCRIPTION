@@ -1,7 +1,7 @@
 Package: metaDTR
 Type: Package
 Title: Optimal Dynamtic Treatment Regime via Meta-learners
-Version: 0.2.2
+Version: 0.2.3
 Author: person("Junyi", "Zhou", email = "junyzhou@iu.edu", role = c("aut", "cre"), comment = c(ORCID = "0000-0003-4493-6997"))
 Maintainer: Junyi Zhou <junyzhou@iu.edu>
 Description: The package is developed for optimal dynamic treatment recommendations. It learns from either sequential randomized experiments or observational studies. More than two treatment options at any stage of intervention is supported.

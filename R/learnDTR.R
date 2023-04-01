@@ -1,4 +1,4 @@
-#' @title Learning DTR from Sequential Interventions
+#' @title Learning DTR from Sequential Interventions (Categorical Treatment)
 #' @author Junyi Zhou \email{junyzhou@iu.edu}
 #' @description This function supports to learn the optimal sequential decision rules from either randomized studies
 #'              or observational ones. Multiple treatment options are supported.
@@ -147,12 +147,12 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         ## generate data set for S-learner:
         dat.tmp = data.frame(trt = A.tr, X.tr)
         for (ii in K.grp) {
-          tmp = data.frame(trt = ii, X.tr)
-          dat.tmp = rbind(dat.tmp, tmp)
+          dat.tmp = rbind(dat.tmp, data.frame(trt = ii, X.tr))
         }
+        remove(X.tr)
         dat.tmp$trt = as.factor(dat.tmp$trt)
-        dat.S = stats::model.matrix(~trt*.-1, dat.tmp)
-        dat.train = dat.S[1:n.train,]; dat.test = dat.S[-(1:n.train),]
+        dat.tmp = stats::model.matrix(~trt*.-1, dat.tmp)
+        dat.train = dat.tmp[1:n.train,]; dat.test = dat.tmp[-(1:n.train),]; remove(dat.tmp)
         ## train by bart/xgboost:
         if (baseLearner[1] == "BART") {
           S.fit = bart(x.train = dat.train, y.train = V.est, keeptrainfits = F,
@@ -162,6 +162,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         if (baseLearner[1] == "XGBoost") {
           dtrain <- xgb.DMatrix(data = dat.train, label = V.est)
           dtest <- xgb.DMatrix(data = dat.test)
+          remove(dat.train, dat.test)
           xgbcv <- xgb.cv( params = params.list, data = dtrain,
                            nrounds = ifelse("nrounds" %in% names(params.cv.tr), params.cv.tr[['nrounds']], 500),
                            nfold = ifelse("nfold" %in% names(params.cv.tr), params.cv.tr[['nfold']], 5),
@@ -178,7 +179,7 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         ## KEY: update V.est properly
         V.est = apply(S.est, 1, max)
         ## clean some memory:
-        remove("S.est", "dat.train", "dat.test")
+        suppressWarnings(remove("S.est", "dat.train", "dat.test"))
         ## Store the trained learners
         S.learners = c(S.learners, list(S.fit))
         remove("S.fit")
@@ -334,12 +335,12 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
         ## generate data set for S-learner:
         dat.tmp = data.frame(trt = A.tr, X.tr)
         for (ii in K.grp) {
-          tmp = data.frame(trt = ii, X.tr)
-          dat.tmp = rbind(dat.tmp, tmp)
+          dat.tmp = rbind(dat.tmp, data.frame(trt = ii, X.tr))
         }
+        remove(X.tr)
         dat.tmp$trt = as.factor(dat.tmp$trt)
-        dat.S = stats::model.matrix(~trt*.-1, dat.tmp)
-        dat.train = dat.S[1:n.train,]; dat.test = dat.S[-(1:n.train),]
+        dat.S = stats::model.matrix(~trt*.-1, dat.tmp); remove(dat.tmp)
+        dat.train = dat.S[1:n.train,]; dat.test = dat.S[-(1:n.train),]; remove(dat.S)
         ## train by ranger:
         S.fit = ranger(V~., data = data.frame(V = V.est, dat.train), ...)
         S.est = matrix(predict(S.fit, data = data.frame(dat.test))$predictions, ncol = length(K.grp), byrow = F)
@@ -476,9 +477,10 @@ learnDTR <- function(X, A, Y, weights = rep(1, length(X)),
           tmp = data.frame(trt = ii, X.tr)
           dat.tmp = rbind(dat.tmp, tmp)
         }
+        remove(X.tr)
         dat.tmp$trt = as.factor(dat.tmp$trt)
-        dat.S = stats::model.matrix(~trt*.-1, dat.tmp)
-        dat.train = dat.S[1:n.train,]; dat.test = dat.S[-(1:n.train),]
+        dat.S = stats::model.matrix(~trt*.-1, dat.tmp); remove(dat.tmp)
+        dat.train = dat.S[1:n.train,]; dat.test = dat.S[-(1:n.train),]; remove(dat.S)
         ## train by glmnet with LASSO penalty:
         S.fit = cv.glmnet(dat.train, V.est, family = "gaussian", parallel = TRUE, ...)
         S.est = matrix(predict(S.fit, newx = dat.test, type = "response", s = "lambda.min"), ncol = length(K.grp), byrow = F)
