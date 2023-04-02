@@ -57,7 +57,7 @@
 #'                      include.X = 1,
 #'                      include.A = 2,
 #'                      include.Y = 0)
-#' @import stats utils dbarts glmnet ranger xgboost
+#' @import stats utils dbarts glmnet ranger xgboost pbapply
 #' @references
 #' Künzel, Sören R., Jasjeet S. Sekhon, Peter J. Bickel, and Bin Yu.
 #' "Metalearners for estimating heterogeneous treatment effects using machine learning."
@@ -151,7 +151,10 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
           S.fit = bart(x.train = stats::model.matrix(~trt*.-1, dat.tmp), y.train = V.est, keeptrainfits = F,
                        keeptrees = TRUE, verbose = FALSE, ...)
           remove(dat.tmp)
-          S.est = apply(X.tr, 1, function(x) {
+          if (verbose) {
+            print(paste0(Sys.time(), ": Fitting part done!! Next is doing some estimation jobs for next stage."))
+          }
+          S.est = pbapply(X.tr, 1, function(x) {
             dat.tmp = data.frame(trt = A.range, outer(A.range, x)); colnames(dat.tmp) <- store.names
             return( predict(S.fit, newdata = stats::model.matrix(~trt*.-1, dat.tmp)) )
           }) # should be 100 x nrow(X.tr)
@@ -170,8 +173,10 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
                              watchlist = list(train=dtrain),
                              eval_metric = ifelse("eval_metric" %in% names(params.cv.tr), params.cv.tr[['eval_metric']], 'rmse'),
                              maximize = F, verbose = FALSE)
-
-          S.est = apply(X.tr, 1, function(x) {
+          if (verbose) {
+            print(paste0(Sys.time(), ": Fitting part done!! Next is doing some estimation jobs for next stage."))
+          }
+          S.est = pbapply(X.tr, 1, function(x) {
             dat.tmp = data.frame(trt = A.range, outer(A.range, x)); colnames(dat.tmp) <- store.names
             return(predict( S.fit, xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp) ) ))
           }) # should be 100 x nrow(X.tr)
@@ -240,7 +245,10 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
 
         ## train by ranger:
         S.fit = ranger(V~., data = data.frame(V = V.est, dat.tmp), ...)
-        S.est = apply(X.tr, 1, function(x) {
+        if (verbose) {
+          print(paste0(Sys.time(), ": Fitting part done!! Next is doing some estimation jobs for next stage."))
+        }
+        S.est = pbapply(X.tr, 1, function(x) {
           dat.tmp = stats::model.matrix(~trt*.-1, data.frame(trt = A.range, outer(A.range, x)) )
           return(predict(S.fit, data = data.frame(dat.tmp))$predictions)
         }) # should be 100 x nrow(X.tr)
@@ -311,7 +319,10 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
 
         ## train by glmnet with LASSO penalty:
         S.fit = cv.glmnet(stats::model.matrix(~trt*.-1, dat.tmp), V.est, family = "gaussian", parallel = TRUE, ...)
-        S.est = apply(X.tr, 1, function(x) {
+        if (verbose) {
+          print(paste0(Sys.time(), ": Fitting part done!! Next is doing some estimation jobs for next stage."))
+        }
+        S.est = pbapply(X.tr, 1, function(x) {
           dat.tmp = data.frame(trt = A.range, outer(A.range, x)); colnames(dat.tmp) <- store.names
           return(predict(S.fit, newx = stats::model.matrix(~trt*.-1, dat.tmp), type = "response", s = "lambda.min"))
         }) # should be 100 x nrow(X.tr)
