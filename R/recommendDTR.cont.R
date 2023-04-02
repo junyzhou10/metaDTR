@@ -11,11 +11,13 @@
 #'              It allows to handle cases that the realized action/observation may not be consistent
 #'              with algorithm results. Only needed when \code{all.inclusive = TRUE}.
 #'              Default is \code{NULL}.
+#' @param Y.new A list. Required if \code{include.Y > 0} in [learnDTR()]. Default is \code{NULL}
 #' @param A.feasible Optional list, default is \code{NULL}. This allow user to specify the subject level's feasible action/treatment
 #'                   space. The length of list should be equal to the number of stages, and each element should be
 #'                   an N x 2 of matrix, where N represents the number of subjects and each row is the range of
 #'                   feasible action/treatment, i.e., (min, max).
-#' @param Y.new A list. Required if \code{include.Y > 0} in [learnDTR()]. Default is \code{NULL}
+#' @param parallel A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
+#'                 number of cores to use. Otherwise, directly use the number from `detectCores()`
 #' @details This function make recommendations based on the trained learners from [learnDTR()] for new dataset.
 #'          Since in real application, later stage covariates/outcomes are unobservable until treatments are
 #'          assigned. So in most cases, [recommendDTR()] needs to be applied stage by stage, which is allowed in
@@ -40,11 +42,12 @@
 #'                      include.Y = 0)
 #' optDTR <- recommendDTR.cont(DTRs, currentDTRs = NULL,
 #'                             X.new = ThreeStg_Dat$X.test)
+#' @import dbarts glmnet ranger xgboost pbapply doParallel snow utils foreach
 #' @export
 #' @seealso \code{\link{learnDTR}}
 
 recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
-                              X.new, A.new = NULL, Y.new = NULL, A.feasible = NULL) {
+                              X.new, A.new = NULL, Y.new = NULL, A.feasible = NULL, parallel = FALSE) {
   n.stage <- DTRs$controls$n.stage
   baseLearner <- DTRs$controls$baseLearner
   metaLearners <- DTRs$controls$metaLearners
@@ -52,6 +55,34 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
   include.X <- DTRs$controls$include.X
   include.Y <- DTRs$controls$include.Y
   include.A <- DTRs$controls$include.A
+  verbose <- DTRs$controls$verbose
+
+  ## Register cores if parallel
+  if (parallel == FALSE) {
+
+  } else {
+    # Progress combine function
+    f <- function(iterator){
+      pb <- txtProgressBar(min = 1, max = iterator - 1, style = 3)
+      count <- 0
+      function(...) {
+        count <<- count + length(list(...)) - 1
+        setTxtProgressBar(pb, count)
+        flush.console()
+        c(...) # this can feed into .combine option of foreach
+      }
+    }
+
+    if (is.numeric(parallel)) {
+      # Start a cluster
+      cl <- makeCluster(parallel, type='SOCK')
+      registerDoParallel(cl)
+    } else {
+      # Start a cluster
+      cl <- makeCluster(detectCores(), type='SOCK')
+      registerDoParallel(cl)
+    }
+  }
 
   ######==================== check/arrange inputs ====================
   if (is.null(currentDTRs)) {
@@ -133,59 +164,123 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
         ## predict outcome based on trained learners:
         A.range = seq(min(A.list[[stage]]), max(A.list[[stage]]), length.out = 100)
         if (baseLearner == "BART") {
-          A.pred = sapply(1:nrow(X.te), function(i) {
-            if (!is.null(A.feasible)) {
-              A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
-            } else {
-              A.ff = A.range
+          if (parallel == FALSE) {
+            A.pred = pbsapply(1:nrow(X.te), function(i) {
+              if (!is.null(A.feasible)) {
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+              } else {
+                A.ff = A.range
+              }
+              dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
+              Y.pred = colMeans(predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = stats::model.matrix(~trt*.-1, dat.tmp)))
+              return( A.ff[which.max(Y.pred)] )
+            })
+          } else {
+            A.pred = foreach(i=1:nrow(X.te), .packages=c("dbarts"), .combine = f(nrow(X.te))) %dopar% {
+              if (!is.null(A.feasible)) {
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+              } else {
+                A.ff = A.range
+              }
+              dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
+              Y.pred = colMeans(predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = stats::model.matrix(~trt*.-1, dat.tmp)))
+              return( A.ff[which.max(Y.pred)] )
             }
-            dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
-            Y.pred = colMeans(predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = stats::model.matrix(~trt*.-1, dat.tmp)))
-            return( A.ff[which.max(Y.pred)] )
-          })
+          }
         }
+
         if (baseLearner == "XGBoost") {
-          A.pred = sapply(1:nrow(X.te), function(i) {
-            if (!is.null(A.feasible)) {
-              A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
-            } else {
-              A.ff = A.range
+          if (parallel == FALSE) {
+            A.pred = pbsapply(1:nrow(X.te), function(i) {
+              if (!is.null(A.feasible)) {
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+              } else {
+                A.ff = A.range
+              }
+              dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
+              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp)))
+              return( A.ff[which.max(Y.pred)] )
+            })
+          } else {
+            A.pred = foreach(i=1:nrow(X.te), .packages=c("xgboost"), .combine = f(nrow(X.te))) %dopar% {
+              if (!is.null(A.feasible)) {
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+              } else {
+                A.ff = A.range
+              }
+              dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
+              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp)))
+              return( A.ff[which.max(Y.pred)] )
             }
-            dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
-            Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp)))
-            return( A.ff[which.max(Y.pred)] )
-          })
-
+          }
         }
+
+
         if (baseLearner == "RF") {
-          A.pred = sapply(1:nrow(X.te), function(i) {
-            if (!is.null(A.feasible)) {
-              A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
-            } else {
-              A.ff = A.range
-            }
-            dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
-            dat.tmp = stats::model.matrix(~trt*.-1, dat.tmp )
+          if (parallel == FALSE) {
+            A.pred = pbsapply(1:nrow(X.te), function(i) {
+              if (!is.null(A.feasible)) {
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+              } else {
+                A.ff = A.range
+              }
+              dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
+              dat.tmp = stats::model.matrix(~trt*.-1, dat.tmp )
 
-            Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], data = data.frame(dat.tmp) )$predictions
-            return( A.ff[which.max(Y.pred)] )
-          })
-        }
-        if (baseLearner == "GAM") {
-          A.pred = sapply(1:nrow(X.te), function(i) {
-            if (!is.null(A.feasible)) {
-              A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
-            } else {
-              A.ff = A.range
+              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], data = data.frame(dat.tmp) )$predictions
+              return( A.ff[which.max(Y.pred)] )
+            })
+          } else {
+            A.pred = foreach(i=1:nrow(X.te), .packages=c("ranger"), .combine = f(nrow(X.te))) %dopar% {
+              if (!is.null(A.feasible)) {
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+              } else {
+                A.ff = A.range
+              }
+              dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
+              dat.tmp = stats::model.matrix(~trt*.-1, dat.tmp )
+
+              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], data = data.frame(dat.tmp) )$predictions
+              return( A.ff[which.max(Y.pred)] )
             }
-            dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
-            Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], newx = stats::model.matrix(~trt*.-1, dat.tmp),
-                             type = "response", s = "lambda.min")
-            return( A.ff[which.max(Y.pred)] )
-          })
+          }
         }
+
+
+        if (baseLearner == "GAM") {
+          if (parallel == FALSE) {
+            A.pred = pbsapply(1:nrow(X.te), function(i) {
+              if (!is.null(A.feasible)) {
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+              } else {
+                A.ff = A.range
+              }
+              dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
+              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], newx = stats::model.matrix(~trt*.-1, dat.tmp),
+                               type = "response", s = "lambda.min")
+              return( A.ff[which.max(Y.pred)] )
+            })
+          } else {
+            A.pred = foreach(i=1:nrow(X.te), .packages=c("glmnet"), .combine = f(nrow(X.te))) %dopar% {
+              if (!is.null(A.feasible)) {
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+              } else {
+                A.ff = A.range
+              }
+              dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
+              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], newx = stats::model.matrix(~trt*.-1, dat.tmp),
+                               type = "response", s = "lambda.min")
+              return( A.ff[which.max(Y.pred)] )
+            }
+          }
+        }
+
+
         A.opt.S = c(A.opt.S, list(A.pred))
         A.new <- c(A.new, list(A.pred))
+        if (verbose) {
+          print(paste0(Sys.time(), ": Stage ", stage, " done!!"))
+        }
       }
       names(A.opt.S) <- c(names(currentDTRs$A.opt.S), paste("Stage", seq(start, n.step, by = 1), sep = "."))
     }
@@ -196,7 +291,10 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
     warning("Please choose a proper base-learner!\n")
   }
 
-
+  if (!parallel == FALSE) {
+    #Stop the cluster
+    stopCluster(cl)
+  }
   ######========== Prepare outputs
   OptDTR <- list(A.opt.S = A.opt.S,
                  controls = list(

@@ -15,6 +15,7 @@ learnDTR.cont(
   include.A = 0,
   include.Y = 0,
   est.sigma = NULL,
+  parallel = FALSE,
   verbose = TRUE,
   ...
 )
@@ -55,6 +56,9 @@ Y included}
 \item{est.sigma}{Initial estimation of sigma. Only for T-learner with BART. If sample size is not enough to estimate
 surface separately, or algorithm experience some trouble in getting sigma, use this argument to
 provide an initial estimate.}
+
+\item{parallel}{A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
+number of cores to use. Otherwise, directly use the number from \code{detectCores()}}
 
 \item{verbose}{Console print allowed?}
 

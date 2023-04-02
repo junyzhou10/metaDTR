@@ -10,7 +10,8 @@ recommendDTR.cont(
   X.new,
   A.new = NULL,
   Y.new = NULL,
-  A.feasible = NULL
+  A.feasible = NULL,
+  parallel = FALSE
 )
 }
 \arguments{
@@ -34,6 +35,9 @@ Default is \code{NULL}.}
 space. The length of list should be equal to the number of stages, and each element should be
 an N x 2 of matrix, where N represents the number of subjects and each row is the range of
 feasible action/treatment, i.e., (min, max).}
+
+\item{parallel}{A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
+number of cores to use. Otherwise, directly use the number from \code{detectCores()}}
 }
 \value{
 It returns the optimal action/treatment recommendations at each stage and results are stored in a list for
