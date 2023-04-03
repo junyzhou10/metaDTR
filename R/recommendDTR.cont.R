@@ -99,7 +99,13 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
     if (class(X.new)[1] != "list") {
       X.new = list(X.new)
     }
-    if (is.null(A.feasible)) {rep(list(NULL), length(X.new))}
+    if (is.null(A.feasible)) {
+      rep(list(NULL), length(X.new))
+    } else {
+      if (class(A.feasible)[1] != "list") {
+        A.feasible = list(A.feasible)
+      }
+    }
     A.obs  <- list(ifelse(is.null(A.new), NA, A.new))
     A.ind  <- !is.na(A.obs)[-1]
     A.opt.S <- A.opt.T <- A.opt.deC <- list() # main output
