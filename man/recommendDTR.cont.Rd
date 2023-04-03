@@ -11,13 +11,14 @@ recommendDTR.cont(
   A.new = NULL,
   Y.new = NULL,
   A.feasible = NULL,
-  parallel = FALSE
+  parallel = FALSE,
+  verbose = NULL
 )
 }
 \arguments{
-\item{DTRs}{Output from \code{\link[=learnDTR]{learnDTR()}} that belong to class \code{metaDTR}.}
+\item{DTRs}{Output from \code{\link[=learnDTR.cont]{learnDTR.cont()}} that belong to class \code{metaDTR}.}
 
-\item{currentDTRs}{Object from \code{\link[=recommendDTR]{recommendDTR()}}. Records the results from previous stages so that users can
+\item{currentDTRs}{Object from \code{\link[=recommendDTR.cont]{recommendDTR.cont()}}. Records the results from previous stages so that users can
 flexibly make predictions stage by stage. See details and example.}
 
 \item{X.new}{A list of covariates at each stage. In practice, since recommendations are made
@@ -29,7 +30,7 @@ It allows to handle cases that the realized action/observation may not be consis
 with algorithm results. Only needed when \code{all.inclusive = TRUE}.
 Default is \code{NULL}.}
 
-\item{Y.new}{A list. Required if \code{include.Y > 0} in \code{\link[=learnDTR]{learnDTR()}}. Default is \code{NULL}}
+\item{Y.new}{A list. Required if \code{include.Y > 0} in \code{\link[=learnDTR.cont]{learnDTR.cont()}}. Default is \code{NULL}}
 
 \item{A.feasible}{Optional list, default is \code{NULL}. This allow user to specify the subject level's feasible action/treatment
 space. The length of list should be equal to the number of stages, and each element should be
@@ -37,7 +38,9 @@ an N x 2 of matrix, where N represents the number of subjects and each row is th
 feasible action/treatment, i.e., (min, max).}
 
 \item{parallel}{A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
-number of cores to use. Otherwise, directly use the number from \code{detectCores()}}
+number of cores to use. Otherwise, directly use the number from \code{\link[=learnDTR.cont]{learnDTR.cont()}}}
+
+\item{verbose}{Console output allowed? Default is \code{NULL}, which will inherit the argument input of}
 }
 \value{
 It returns the optimal action/treatment recommendations at each stage and results are stored in a list for
@@ -47,11 +50,11 @@ each meta-learner method.
 This function make recommendations of optimal treatment for a given subject at given stage
 }
 \details{
-This function make recommendations based on the trained learners from \code{\link[=learnDTR]{learnDTR()}} for new dataset.
+This function make recommendations based on the trained learners from \code{\link[=learnDTR.cont]{learnDTR.cont()}} for new dataset.
 Since in real application, later stage covariates/outcomes are unobservable until treatments are
-assigned. So in most cases, \code{\link[=recommendDTR]{recommendDTR()}} needs to be applied stage by stage, which is allowed in
-this package. User can provide available information at any stage and obtain the optimal recommendations
-at that stage.
+assigned. So in most cases, \code{\link[=recommendDTR.cont]{recommendDTR.cont()}} needs to be applied stage by stage, which is allowed in
+this package. User can provide available information stage by stage, and obtain the optimal recommendations
+at each stage, iteratively.
 }
 \examples{
 ## To see details of applying this function to obtain optimal DTR on new dataset, please
@@ -71,7 +74,7 @@ optDTR <- recommendDTR.cont(DTRs, currentDTRs = NULL,
                             X.new = ThreeStg_Dat$X.test)
 }
 \seealso{
-\code{\link{learnDTR}}
+\code{\link{learnDTR.cont}}
 }
 \author{
 Junyi Zhou \email{junyzhou@iu.edu}

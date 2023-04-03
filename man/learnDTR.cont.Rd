@@ -67,8 +67,8 @@ number of cores to use. Otherwise, directly use the number from \code{detectCore
 }
 \value{
 It includes learning results, basically, the trained functions that can be used for predictions. Since
-sequential recommendations might require intermediate observations, \link{learnDTR} will not automatically
-provide prediction. But by another function \link{recommendDTR},
+sequential recommendations might require intermediate observations, \link{learnDTR.cont} will not automatically
+provide prediction. But by another function \link{recommendDTR.cont},
 predictions can flexibly been made stage by stage.
 }
 \description{
@@ -108,7 +108,7 @@ Zhou, Junyi, Ying Zhang, and Wanzhu Tu. "A reference-free R-learner for treatmen
 \emph{Statistical Methods in Medical Research} (2022)
 }
 \seealso{
-\code{\link{recommendDTR}}
+\code{\link{recommendDTR.cont}}
 }
 \author{
 Junyi Zhou \email{junyzhou@iu.edu}

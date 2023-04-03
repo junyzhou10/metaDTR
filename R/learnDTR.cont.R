@@ -44,8 +44,8 @@
 #'          It is strongly suggested to adopt BART over random forests as baselearner if sample size is small.
 #'
 #' @return It includes learning results, basically, the trained functions that can be used for predictions. Since
-#'         sequential recommendations might require intermediate observations, [learnDTR] will not automatically
-#'         provide prediction. But by another function [recommendDTR],
+#'         sequential recommendations might require intermediate observations, [learnDTR.cont] will not automatically
+#'         provide prediction. But by another function [recommendDTR.cont],
 #'         predictions can flexibly been made stage by stage.
 #' @examples
 #' ## this is the sample adopted in:
@@ -68,7 +68,7 @@
 #' Zhou, Junyi, Ying Zhang, and Wanzhu Tu. "A reference-free R-learner for treatment recommendation."
 #' *Statistical Methods in Medical Research* (2022)
 #' @export
-#' @seealso \code{\link{recommendDTR}}
+#' @seealso \code{\link{recommendDTR.cont}}
 
 learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
                           baseLearner  = c("RF", "BART", "XGBoost", "GAM"),

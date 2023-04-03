@@ -1,8 +1,8 @@
 #' @title Recommend the optimal treatment at each stage (Continuous Treatment)
 #' @author Junyi Zhou \email{junyzhou@iu.edu}
 #' @description This function make recommendations of optimal treatment for a given subject at given stage
-#' @param DTRs Output from [learnDTR()] that belong to class \code{metaDTR}.
-#' @param currentDTRs Object from [recommendDTR()]. Records the results from previous stages so that users can
+#' @param DTRs Output from [learnDTR.cont()] that belong to class \code{metaDTR}.
+#' @param currentDTRs Object from [recommendDTR.cont()]. Records the results from previous stages so that users can
 #'                    flexibly make predictions stage by stage. See details and example.
 #' @param X.new A list of covariates at each stage. In practice, since recommendations are made
 #'              stage by stage, here one stage of \code{X.new} will provide one stage's recommendation of action.
@@ -11,18 +11,19 @@
 #'              It allows to handle cases that the realized action/observation may not be consistent
 #'              with algorithm results. Only needed when \code{all.inclusive = TRUE}.
 #'              Default is \code{NULL}.
-#' @param Y.new A list. Required if \code{include.Y > 0} in [learnDTR()]. Default is \code{NULL}
+#' @param Y.new A list. Required if \code{include.Y > 0} in [learnDTR.cont()]. Default is \code{NULL}
 #' @param A.feasible Optional list, default is \code{NULL}. This allow user to specify the subject level's feasible action/treatment
 #'                   space. The length of list should be equal to the number of stages, and each element should be
 #'                   an N x 2 of matrix, where N represents the number of subjects and each row is the range of
 #'                   feasible action/treatment, i.e., (min, max).
 #' @param parallel A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
-#'                 number of cores to use. Otherwise, directly use the number from `detectCores()`
-#' @details This function make recommendations based on the trained learners from [learnDTR()] for new dataset.
+#'                 number of cores to use. Otherwise, directly use the number from [learnDTR.cont()]
+#' @param verbose Console output allowed? Default is \code{NULL}, which will inherit the argument input of
+#' @details This function make recommendations based on the trained learners from [learnDTR.cont()] for new dataset.
 #'          Since in real application, later stage covariates/outcomes are unobservable until treatments are
-#'          assigned. So in most cases, [recommendDTR()] needs to be applied stage by stage, which is allowed in
-#'          this package. User can provide available information at any stage and obtain the optimal recommendations
-#'          at that stage.
+#'          assigned. So in most cases, [recommendDTR.cont()] needs to be applied stage by stage, which is allowed in
+#'          this package. User can provide available information stage by stage, and obtain the optimal recommendations
+#'          at each stage, iteratively.
 #'
 #' @return It returns the optimal action/treatment recommendations at each stage and results are stored in a list for
 #'         each meta-learner method.
@@ -44,10 +45,10 @@
 #'                             X.new = ThreeStg_Dat$X.test)
 #' @import dbarts glmnet ranger xgboost pbapply doParallel snow utils foreach
 #' @export
-#' @seealso \code{\link{learnDTR}}
+#' @seealso \code{\link{learnDTR.cont}}
 
 recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
-                              X.new, A.new = NULL, Y.new = NULL, A.feasible = NULL, parallel = FALSE) {
+                              X.new, A.new = NULL, Y.new = NULL, A.feasible = NULL, parallel = FALSE, verbose = NULL) {
   n.stage <- DTRs$controls$n.stage
   baseLearner <- DTRs$controls$baseLearner
   metaLearners <- DTRs$controls$metaLearners
@@ -55,7 +56,16 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
   include.X <- DTRs$controls$include.X
   include.Y <- DTRs$controls$include.Y
   include.A <- DTRs$controls$include.A
-  verbose <- DTRs$controls$verbose
+  if (is.null(verbose)) {
+    verbose <- DTRs$controls$verbose
+  }
+
+  # a simply defined function to reflect verbose requirement
+  if (verbose) {
+    my.sapply <- function(...){pbsapply(...)}
+  } else {
+    my.sapply <- function(...){sapply(...)}
+  }
 
   ## Register cores if parallel
   if (parallel == FALSE) {
@@ -89,6 +99,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
     if (class(X.new)[1] != "list") {
       X.new = list(X.new)
     }
+    if (is.null(A.feasible)) {rep(list(NULL), length(X.new))}
     A.obs  <- list(ifelse(is.null(A.new), NA, A.new))
     A.ind  <- !is.na(A.obs)[-1]
     A.opt.S <- A.opt.T <- A.opt.deC <- list() # main output
@@ -105,6 +116,11 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
       Y.new = c(currentDTRs$controls$Y.new, Y.new)
     } else {
       Y.new = c(currentDTRs$controls$Y.new, list(Y.new))
+    }
+    if (class(A.feasible)[1] == "list") {
+      A.feasible = c(currentDTRs$controls$A.feasible, A.feasible)
+    } else {
+      A.feasible = c(currentDTRs$controls$A.feasible, list(A.feasible))
     }
     A.opt.S <- currentDTRs$A.opt.S
     A.opt.T <- currentDTRs$A.opt.T
@@ -165,8 +181,8 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
         A.range = seq(min(A.list[[stage]]), max(A.list[[stage]]), length.out = 100)
         if (baseLearner == "BART") {
           if (parallel == FALSE) {
-            A.pred = pbsapply(1:nrow(X.te), function(i) {
-              if (!is.null(A.feasible)) {
+            A.pred = my.sapply(1:nrow(X.te), function(i) {
+              if (!is.null(A.feasible[[stage]])) {
                 A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
               } else {
                 A.ff = A.range
@@ -177,7 +193,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
             })
           } else {
             A.pred = foreach(i=1:nrow(X.te), .packages=c("dbarts"), .combine = f(nrow(X.te))) %dopar% {
-              if (!is.null(A.feasible)) {
+              if (!is.null(A.feasible[[stage]])) {
                 A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
               } else {
                 A.ff = A.range
@@ -191,8 +207,8 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
 
         if (baseLearner == "XGBoost") {
           if (parallel == FALSE) {
-            A.pred = pbsapply(1:nrow(X.te), function(i) {
-              if (!is.null(A.feasible)) {
+            A.pred = my.sapply(1:nrow(X.te), function(i) {
+              if (!is.null(A.feasible[[stage]])) {
                 A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
               } else {
                 A.ff = A.range
@@ -203,7 +219,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
             })
           } else {
             A.pred = foreach(i=1:nrow(X.te), .packages=c("xgboost"), .combine = f(nrow(X.te))) %dopar% {
-              if (!is.null(A.feasible)) {
+              if (!is.null(A.feasible[[stage]])) {
                 A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
               } else {
                 A.ff = A.range
@@ -218,8 +234,8 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
 
         if (baseLearner == "RF") {
           if (parallel == FALSE) {
-            A.pred = pbsapply(1:nrow(X.te), function(i) {
-              if (!is.null(A.feasible)) {
+            A.pred = my.sapply(1:nrow(X.te), function(i) {
+              if (!is.null(A.feasible[[stage]])) {
                 A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
               } else {
                 A.ff = A.range
@@ -232,7 +248,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
             })
           } else {
             A.pred = foreach(i=1:nrow(X.te), .packages=c("ranger"), .combine = f(nrow(X.te))) %dopar% {
-              if (!is.null(A.feasible)) {
+              if (!is.null(A.feasible[[stage]])) {
                 A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
               } else {
                 A.ff = A.range
@@ -249,8 +265,8 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
 
         if (baseLearner == "GAM") {
           if (parallel == FALSE) {
-            A.pred = pbsapply(1:nrow(X.te), function(i) {
-              if (!is.null(A.feasible)) {
+            A.pred = my.sapply(1:nrow(X.te), function(i) {
+              if (!is.null(A.feasible[[stage]])) {
                 A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
               } else {
                 A.ff = A.range
@@ -262,7 +278,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
             })
           } else {
             A.pred = foreach(i=1:nrow(X.te), .packages=c("glmnet"), .combine = f(nrow(X.te))) %dopar% {
-              if (!is.null(A.feasible)) {
+              if (!is.null(A.feasible[[stage]])) {
                 A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
               } else {
                 A.ff = A.range
@@ -300,6 +316,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
                  controls = list(
                    X.new = X.new,
                    A.obs = A.obs,
+                   A.feasible = A.feasible,
                    Y.new = Y.new,
                    n.stage = n.stage,
                    A.list  = A.list,
