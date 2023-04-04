@@ -185,18 +185,19 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
             print(paste0(Sys.time(), ": Fitting part done!! Next is doing some estimation jobs for next stage."))
           }
 
-          if (parallel == FALSE) {
-            S.est = pbapply(X.tr, 1, function(x) {
-              dat.tmp = data.frame(trt = A.range, outer(A.range, x)); colnames(dat.tmp) <- store.names
-              return( colMeans(predict(S.fit, newdata = stats::model.matrix(~trt*.-1, dat.tmp))) )
-            }) # should be 100 x nrow(X.tr)
-          } else {
-            S.est = foreach(i=1:nrow(X.tr), .packages=c("dbarts"), .combine = f(nrow(X.tr))) %dopar% {
-              dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
-              return( colMeans(predict(S.fit, newdata = stats::model.matrix(~trt*.-1, dat.tmp))) )
-            } # should be 100 x nrow(X.tr)
+          if (stage>1) {
+            if (parallel == FALSE) {
+              S.est = pbapply(X.tr, 1, function(x) {
+                dat.tmp = data.frame(trt = A.range, outer(A.range, x)); colnames(dat.tmp) <- store.names
+                return( colMeans(predict(S.fit, newdata = stats::model.matrix(~trt*.-1, dat.tmp))) )
+              }) # should be 100 x nrow(X.tr)
+            } else {
+              S.est = foreach(i=1:nrow(X.tr), .packages=c("dbarts"), .combine = f(nrow(X.tr))) %dopar% {
+                dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
+                return( colMeans(predict(S.fit, newdata = stats::model.matrix(~trt*.-1, dat.tmp))) )
+              } # should be 100 x nrow(X.tr)
+            }
           }
-
         }
         if (baseLearner[1] == "XGBoost") {
           dtrain <- xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp), label = V.est)
@@ -216,21 +217,22 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
             print(paste0(Sys.time(), ": Fitting part done!! Next is doing some estimation jobs for next stage."))
           }
 
-          if (parallel == FALSE) {
-            S.est = pbapply(X.tr, 1, function(x) {
-              dat.tmp = data.frame(trt = A.range, outer(A.range, x)); colnames(dat.tmp) <- store.names
-              return(predict( S.fit, xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp) ) ))
-            }) # should be 100 x nrow(X.tr)
-          } else {
-            S.est = foreach(i=1:nrow(X.tr), .packages=c("xgboost"), .combine = f(nrow(X.tr))) %dopar% {
-              dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
-              return(predict( S.fit, xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp) ) ))
-            } # should be 100 x nrow(X.tr)
+          if (stage>1) {
+            if (parallel == FALSE) {
+              S.est = pbapply(X.tr, 1, function(x) {
+                dat.tmp = data.frame(trt = A.range, outer(A.range, x)); colnames(dat.tmp) <- store.names
+                return(predict( S.fit, xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp) ) ))
+              }) # should be 100 x nrow(X.tr)
+            } else {
+              S.est = foreach(i=1:nrow(X.tr), .packages=c("xgboost"), .combine = f(nrow(X.tr))) %dopar% {
+                dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
+                return(predict( S.fit, xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp) ) ))
+              } # should be 100 x nrow(X.tr)
+            }
           }
-
         }
         ## KEY: update V.est properly
-        V.est = apply(S.est, 2, max)
+        if (stage>1) {V.est = apply(S.est, 2, max)}
         ## clean some memory:
         suppressWarnings(remove("S.est", "dat.train", "dat.test"))
         ## Store the trained learners
@@ -298,21 +300,23 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
           print(paste0(Sys.time(), ": Fitting part done!! Next is doing some estimation jobs for next stage."))
         }
 
-        if (parallel == FALSE) {
-          S.est = pbapply(X.tr, 1, function(x) {
-            dat.tmp = stats::model.matrix(~trt*.-1, data.frame(trt = A.range, outer(A.range, x)) )
-            return(predict(S.fit, data = data.frame(dat.tmp))$predictions)
-          }) # should be 100 x nrow(X.tr)
-        } else {
-          S.est = foreach(i=1:nrow(X.tr), .packages=c("ranger"), .combine = f(nrow(X.tr))) %dopar% {
-            dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- c("trt", colnames(X.tr))
-            dat.tmp = stats::model.matrix(~trt*.-1, dat.tmp)
-            return(predict(S.fit, data = data.frame(dat.tmp))$predictions)
-          } # should be 100 x nrow(X.tr)
+        if (stage>1) {
+          if (parallel == FALSE) {
+            S.est = pbapply(X.tr, 1, function(x) {
+              dat.tmp = stats::model.matrix(~trt*.-1, data.frame(trt = A.range, outer(A.range, x)) )
+              return(predict(S.fit, data = data.frame(dat.tmp))$predictions)
+            }) # should be 100 x nrow(X.tr)
+          } else {
+            S.est = foreach(i=1:nrow(X.tr), .packages=c("ranger"), .combine = f(nrow(X.tr))) %dopar% {
+              dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- c("trt", colnames(X.tr))
+              dat.tmp = stats::model.matrix(~trt*.-1, dat.tmp)
+              return(predict(S.fit, data = data.frame(dat.tmp))$predictions)
+            } # should be 100 x nrow(X.tr)
+          }
         }
 
         ## KEY: update V.est properly
-        V.est = apply(S.est, 2, max)
+        if (stage>1) {V.est = apply(S.est, 2, max)}
         ## clean some memory:
         suppressWarnings(remove("S.est", "dat.train", "dat.test"))
         ## Store the trained learners
@@ -380,21 +384,23 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
         if (verbose) {
           print(paste0(Sys.time(), ": Fitting part done!! Next is doing some estimation jobs for next stage."))
         }
-        if (parallel == FALSE) {
-          S.est = pbapply(X.tr, 1, function(x) {
-            dat.tmp = data.frame(trt = A.range, outer(A.range, x)); colnames(dat.tmp) <- store.names
-            return(predict(S.fit, newx = stats::model.matrix(~trt*.-1, dat.tmp), type = "response", s = "lambda.min"))
-          }) # should be 100 x nrow(X.tr)
-        } else {
-          S.est = foreach(i=1:nrow(X.tr), .packages=c("glmnet"), .combine = f(nrow(X.tr))) %dopar% {
-            dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
-            return(predict(S.fit, newx = stats::model.matrix(~trt*.-1, dat.tmp), type = "response", s = "lambda.min"))
-          } # should be 100 x nrow(X.tr)
+
+        if (stage>1) {
+          if (parallel == FALSE) {
+            S.est = pbapply(X.tr, 1, function(x) {
+              dat.tmp = data.frame(trt = A.range, outer(A.range, x)); colnames(dat.tmp) <- store.names
+              return(predict(S.fit, newx = stats::model.matrix(~trt*.-1, dat.tmp), type = "response", s = "lambda.min"))
+            }) # should be 100 x nrow(X.tr)
+          } else {
+            S.est = foreach(i=1:nrow(X.tr), .packages=c("glmnet"), .combine = f(nrow(X.tr))) %dopar% {
+              dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
+              return(predict(S.fit, newx = stats::model.matrix(~trt*.-1, dat.tmp), type = "response", s = "lambda.min"))
+            } # should be 100 x nrow(X.tr)
+          }
         }
 
-
         ## KEY: update V.est properly
-        V.est = apply(S.est, 2, max)
+        if (stage>1) {V.est = apply(S.est, 2, max)}
         ## Store the trained learners
         S.learners = c(S.learners, list(S.fit))
       }
