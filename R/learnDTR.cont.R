@@ -30,6 +30,7 @@
 #'                  provide an initial estimate.
 #' @param parallel A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
 #'                 number of cores to use. Otherwise, directly use the number from `detectCores()`
+#' @param n.grid Number of grid used to search for the best treatment/action. Large values slow down the algorithm.
 #' @param verbose Console print allowed?
 #' @param ... Additional arguments that can be passed to \code{dbarts::bart}, \code{ranger::ranger},
 #'            \code{params} of \code{xbgoost::xgb.cv}, or \code{glmnet::cv.glmnet}
@@ -76,6 +77,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
                           include.X = 0, include.A = 0, include.Y = 0,
                           est.sigma = NULL,
                           parallel = FALSE,
+                          n.grid = 100,
                           verbose = TRUE, ...
 ) {
   n.stage = length(X)
@@ -170,7 +172,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
 
         A.tr = A[[stage]]
         Y.tr = Y[[stage]]
-        A.range = seq(min(A.tr), max(A.tr), length.out = 100)
+        A.range = seq(min(A.tr), max(A.tr), length.out = n.grid)
         V.est = V.est + Y.tr*weights[stage]
         ## generate data set for S-learner:
         dat.tmp = data.frame(trt = A.tr, X.tr)
@@ -190,12 +192,12 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
               S.est = pbapply(X.tr, 1, function(x) {
                 dat.tmp = data.frame(trt = A.range, outer(A.range, x)); colnames(dat.tmp) <- store.names
                 return( colMeans(predict(S.fit, newdata = stats::model.matrix(~trt*.-1, dat.tmp))) )
-              }) # should be 100 x nrow(X.tr)
+              }) # should be n.grid x nrow(X.tr)
             } else {
               S.est = foreach(i=1:nrow(X.tr), .packages=c("dbarts"), .combine = f(nrow(X.tr))) %dopar% {
                 dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
                 return( colMeans(predict(S.fit, newdata = stats::model.matrix(~trt*.-1, dat.tmp))) )
-              } # should be 100 x nrow(X.tr)
+              } # should be n.grid x nrow(X.tr)
             }
           }
         }
@@ -222,12 +224,12 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
               S.est = pbapply(X.tr, 1, function(x) {
                 dat.tmp = data.frame(trt = A.range, outer(A.range, x)); colnames(dat.tmp) <- store.names
                 return(predict( S.fit, xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp) ) ))
-              }) # should be 100 x nrow(X.tr)
+              }) # should be n.grid x nrow(X.tr)
             } else {
               S.est = foreach(i=1:nrow(X.tr), .packages=c("xgboost"), .combine = f(nrow(X.tr))) %dopar% {
                 dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
                 return(predict( S.fit, xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp) ) ))
-              } # should be 100 x nrow(X.tr)
+              } # should be n.grid x nrow(X.tr)
             }
           }
         }
@@ -288,7 +290,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
 
         A.tr = A[[stage]]
         Y.tr = Y[[stage]]
-        A.range = seq(min(A.tr), max(A.tr), length.out = 100)
+        A.range = seq(min(A.tr), max(A.tr), length.out = n.grid)
         V.est = V.est + Y.tr*weights[stage]
         ## generate data set for S-learner:
         dat.tmp = stats::model.matrix(~trt*.-1, data.frame(trt = A.tr, X.tr))
@@ -305,13 +307,13 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
             S.est = pbapply(X.tr, 1, function(x) {
               dat.tmp = stats::model.matrix(~trt*.-1, data.frame(trt = A.range, outer(A.range, x)) )
               return(predict(S.fit, data = data.frame(dat.tmp))$predictions)
-            }) # should be 100 x nrow(X.tr)
+            }) # should be n.grid x nrow(X.tr)
           } else {
             S.est = foreach(i=1:nrow(X.tr), .packages=c("ranger"), .combine = f(nrow(X.tr))) %dopar% {
               dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- c("trt", colnames(X.tr))
               dat.tmp = stats::model.matrix(~trt*.-1, dat.tmp)
               return(predict(S.fit, data = data.frame(dat.tmp))$predictions)
-            } # should be 100 x nrow(X.tr)
+            } # should be n.grid x nrow(X.tr)
           }
         }
 
@@ -373,7 +375,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
 
         A.tr = A[[stage]]
         Y.tr = Y[[stage]]
-        A.range = seq(min(A.tr), max(A.tr), length.out = 100)
+        A.range = seq(min(A.tr), max(A.tr), length.out = n.grid)
         V.est = V.est + Y.tr*weights[stage]
         ## generate data set for S-learner:
         dat.tmp = data.frame(trt = A.tr, X.tr)
@@ -390,12 +392,12 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
             S.est = pbapply(X.tr, 1, function(x) {
               dat.tmp = data.frame(trt = A.range, outer(A.range, x)); colnames(dat.tmp) <- store.names
               return(predict(S.fit, newx = stats::model.matrix(~trt*.-1, dat.tmp), type = "response", s = "lambda.min"))
-            }) # should be 100 x nrow(X.tr)
+            }) # should be n.grid x nrow(X.tr)
           } else {
             S.est = foreach(i=1:nrow(X.tr), .packages=c("glmnet"), .combine = f(nrow(X.tr))) %dopar% {
               dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
               return(predict(S.fit, newx = stats::model.matrix(~trt*.-1, dat.tmp), type = "response", s = "lambda.min"))
-            } # should be 100 x nrow(X.tr)
+            } # should be n.grid x nrow(X.tr)
           }
         }
 
@@ -426,6 +428,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
                    include.X = include.X,
                    include.Y = include.Y,
                    include.A = include.A,
+                   n.grid = n.grid,
                    verbose = verbose
                  )
   )

@@ -16,6 +16,7 @@ learnDTR.cont(
   include.Y = 0,
   est.sigma = NULL,
   parallel = FALSE,
+  n.grid = 100,
   verbose = TRUE,
   ...
 )
@@ -59,6 +60,8 @@ provide an initial estimate.}
 
 \item{parallel}{A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
 number of cores to use. Otherwise, directly use the number from \code{detectCores()}}
+
+\item{n.grid}{Number of grid used to search for the best treatment/action. Large values slow down the algorithm.}
 
 \item{verbose}{Console print allowed?}
 

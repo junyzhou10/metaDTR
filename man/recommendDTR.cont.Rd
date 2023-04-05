@@ -11,6 +11,7 @@ recommendDTR.cont(
   A.new = NULL,
   Y.new = NULL,
   A.feasible = NULL,
+  n.grid = NULL,
   parallel = FALSE,
   verbose = NULL
 )
@@ -36,6 +37,8 @@ Default is \code{NULL}.}
 space. The length of list should be equal to the number of stages, and each element should be
 an N x 2 of matrix, where N represents the number of subjects and each row is the range of
 feasible action/treatment, i.e., (min, max).}
+
+\item{n.grid}{Same as in \code{\link[=learnDTR.cont]{learnDTR.cont()}}. If not specified, it will be inherited from \code{\link[=learnDTR.cont]{learnDTR.cont()}}.}
 
 \item{parallel}{A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
 number of cores to use. Otherwise, directly use the number from \code{\link[=learnDTR.cont]{learnDTR.cont()}}}

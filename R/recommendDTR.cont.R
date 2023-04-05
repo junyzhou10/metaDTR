@@ -16,6 +16,7 @@
 #'                   space. The length of list should be equal to the number of stages, and each element should be
 #'                   an N x 2 of matrix, where N represents the number of subjects and each row is the range of
 #'                   feasible action/treatment, i.e., (min, max).
+#' @param n.grid Same as in [learnDTR.cont()]. If not specified, it will be inherited from [learnDTR.cont()].
 #' @param parallel A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
 #'                 number of cores to use. Otherwise, directly use the number from [learnDTR.cont()]
 #' @param verbose Console output allowed? Default is \code{NULL}, which will inherit the argument input of
@@ -48,7 +49,8 @@
 #' @seealso \code{\link{learnDTR.cont}}
 
 recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
-                              X.new, A.new = NULL, Y.new = NULL, A.feasible = NULL, parallel = FALSE, verbose = NULL) {
+                              X.new, A.new = NULL, Y.new = NULL, A.feasible = NULL,
+                              n.grid = NULL, parallel = FALSE, verbose = NULL) {
   n.stage <- DTRs$controls$n.stage
   baseLearner <- DTRs$controls$baseLearner
   metaLearners <- DTRs$controls$metaLearners
@@ -58,6 +60,9 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
   include.A <- DTRs$controls$include.A
   if (is.null(verbose)) {
     verbose <- DTRs$controls$verbose
+  }
+  if (is.null(n.grid)) {
+    n.grid <- DTRs$controls$n.grid
   }
 
   # a simply defined function to reflect verbose requirement
@@ -184,7 +189,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
         }
 
         ## predict outcome based on trained learners:
-        A.range = seq(min(A.list[[stage]]), max(A.list[[stage]]), length.out = 100)
+        A.range = seq(min(A.list[[stage]]), max(A.list[[stage]]), length.out = n.grid)
         if (baseLearner == "BART") {
           if (parallel == FALSE) {
             A.pred = my.sapply(1:nrow(X.te), function(i) {
