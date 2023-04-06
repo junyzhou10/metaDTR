@@ -101,15 +101,6 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
       }
     }
 
-    if (is.numeric(parallel)) {
-      # Start a cluster
-      cl <- makeCluster(parallel, type='SOCK')
-      registerDoParallel(cl)
-    } else {
-      # Start a cluster
-      cl <- makeCluster(detectCores(), type='SOCK')
-      registerDoParallel(cl)
-    }
   }
 
   ######==================== clean arguments in ... ====================
@@ -194,10 +185,24 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
                 return( colMeans(predict(S.fit, newdata = stats::model.matrix(~trt*.-1, dat.tmp))) )
               }) # should be n.grid x nrow(X.tr)
             } else {
+              ## register cores
+              if (is.numeric(parallel)) {
+                # Start a cluster
+                cl <- makeCluster(parallel, type='SOCK')
+                registerDoParallel(cl)
+              } else {
+                # Start a cluster
+                cl <- makeCluster(detectCores(), type='SOCK')
+                registerDoParallel(cl)
+              }
+
               S.est = foreach(i=1:nrow(X.tr), .packages=c("dbarts"), .combine = f(nrow(X.tr))) %dopar% {
                 dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
                 return( colMeans(predict(S.fit, newdata = stats::model.matrix(~trt*.-1, dat.tmp))) )
               } # should be n.grid x nrow(X.tr)
+
+              ## Stop the cluster
+              stopCluster(cl)
             }
           }
         }
@@ -226,10 +231,24 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
                 return(predict( S.fit, xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp) ) ))
               }) # should be n.grid x nrow(X.tr)
             } else {
+              ## register cores
+              if (is.numeric(parallel)) {
+                # Start a cluster
+                cl <- makeCluster(parallel, type='SOCK')
+                registerDoParallel(cl)
+              } else {
+                # Start a cluster
+                cl <- makeCluster(detectCores(), type='SOCK')
+                registerDoParallel(cl)
+              }
+
               S.est = foreach(i=1:nrow(X.tr), .packages=c("xgboost"), .combine = f(nrow(X.tr))) %dopar% {
                 dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
                 return(predict( S.fit, xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp) ) ))
               } # should be n.grid x nrow(X.tr)
+
+              #Stop the cluster
+              stopCluster(cl)
             }
           }
         }
@@ -309,11 +328,25 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
               return(predict(S.fit, data = data.frame(dat.tmp))$predictions)
             }) # should be n.grid x nrow(X.tr)
           } else {
+            ## register cores
+            if (is.numeric(parallel)) {
+              # Start a cluster
+              cl <- makeCluster(parallel, type='SOCK')
+              registerDoParallel(cl)
+            } else {
+              # Start a cluster
+              cl <- makeCluster(detectCores(), type='SOCK')
+              registerDoParallel(cl)
+            }
+
             S.est = foreach(i=1:nrow(X.tr), .packages=c("ranger"), .combine = f(nrow(X.tr))) %dopar% {
               dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- c("trt", colnames(X.tr))
               dat.tmp = stats::model.matrix(~trt*.-1, dat.tmp)
               return(predict(S.fit, data = data.frame(dat.tmp))$predictions)
             } # should be n.grid x nrow(X.tr)
+
+            #Stop the cluster
+            stopCluster(cl)
           }
         }
 
@@ -394,10 +427,24 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
               return(predict(S.fit, newx = stats::model.matrix(~trt*.-1, dat.tmp), type = "response", s = "lambda.min"))
             }) # should be n.grid x nrow(X.tr)
           } else {
+            ## register cores
+            if (is.numeric(parallel)) {
+              # Start a cluster
+              cl <- makeCluster(parallel, type='SOCK')
+              registerDoParallel(cl)
+            } else {
+              # Start a cluster
+              cl <- makeCluster(detectCores(), type='SOCK')
+              registerDoParallel(cl)
+            }
+
             S.est = foreach(i=1:nrow(X.tr), .packages=c("glmnet"), .combine = f(nrow(X.tr))) %dopar% {
               dat.tmp = data.frame(trt = A.range, outer(A.range, as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
               return(predict(S.fit, newx = stats::model.matrix(~trt*.-1, dat.tmp), type = "response", s = "lambda.min"))
             } # should be n.grid x nrow(X.tr)
+
+            #Stop the cluster
+            stopCluster(cl)
           }
         }
 
@@ -413,10 +460,6 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
     }
   }
 
-  if (!parallel == FALSE) {
-    #Stop the cluster
-    stopCluster(cl)
-  }
 
   ######========== Prepare outputs
   DTRres <- list(S.learners = S.learners,
