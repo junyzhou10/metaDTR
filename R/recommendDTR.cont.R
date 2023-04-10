@@ -202,7 +202,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
-                if (is.null(x.list)) {
+                if (is.null(x.select)) {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
                 } else {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
@@ -221,7 +221,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
-                if (is.null(x.list)) {
+                if (is.null(x.select)) {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
                 } else {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
@@ -243,7 +243,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
-                if (is.null(x.list)) {
+                if (is.null(x.select)) {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
                 } else {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
@@ -261,7 +261,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
-                if (is.null(x.list)) {
+                if (is.null(x.select)) {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
                 } else {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
@@ -284,7 +284,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
-                if (is.null(x.list)) {
+                if (is.null(x.select)) {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
                 } else {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
@@ -304,7 +304,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
-                if (is.null(x.list)) {
+                if (is.null(x.select)) {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
                 } else {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
@@ -329,7 +329,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
-                if (is.null(x.list)) {
+                if (is.null(x.select)) {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
                 } else {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
@@ -348,7 +348,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
-                if (is.null(x.list)) {
+                if (is.null(x.select)) {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
                 } else {
                   A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]

@@ -206,7 +206,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
               S.est = pbapply(X.tr, 1, function(x) {
                 # find proper A.range if there is any constraint on A given X/Y
                 if (is.function(A.cnstr.func)) {
-                  if (is.null(x.list)) {
+                  if (is.null(x.select)) {
                     A.range = A.feasible[A.cnstr.func(A.feasible, x)]
                   } else {
                     A.range = A.feasible[A.cnstr.func(A.feasible, x[x.select])]
@@ -232,7 +232,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
               S.est = foreach(i=1:nrow(X.tr), .packages=c("dbarts"), .combine = f(nrow(X.tr))) %dopar% {
                 # find proper A.range if there is any constraint on A given X/Y
                 if (is.function(A.cnstr.func)) {
-                  if (is.null(x.list)) {
+                  if (is.null(x.select)) {
                     A.range = A.feasible[A.cnstr.func(A.feasible, X.tr[i,])]
                   } else {
                     A.range = A.feasible[A.cnstr.func(A.feasible, X.tr[i,x.select])]
@@ -272,7 +272,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
               S.est = pbapply(X.tr, 1, function(x) {
                 # find proper A.range if there is any constraint on A given X/Y
                 if (is.function(A.cnstr.func)) {
-                  if (is.null(x.list)) {
+                  if (is.null(x.select)) {
                     A.range = A.feasible[A.cnstr.func(A.feasible, x)]
                   } else {
                     A.range = A.feasible[A.cnstr.func(A.feasible, x[x.select])]
@@ -298,7 +298,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
               S.est = foreach(i=1:nrow(X.tr), .packages=c("xgboost"), .combine = f(nrow(X.tr))) %dopar% {
                 # find proper A.range if there is any constraint on A given X/Y
                 if (is.function(A.cnstr.func)) {
-                  if (is.null(x.list)) {
+                  if (is.null(x.select)) {
                     A.range = A.feasible[A.cnstr.func(A.feasible, X.tr[i,])]
                   } else {
                     A.range = A.feasible[A.cnstr.func(A.feasible, X.tr[i,x.select])]
@@ -389,7 +389,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
             S.est = pbapply(X.tr, 1, function(x) {
               # find proper A.range if there is any constraint on A given X/Y
               if (is.function(A.cnstr.func)) {
-                if (is.null(x.list)) {
+                if (is.null(x.select)) {
                   A.range = A.feasible[A.cnstr.func(A.feasible, x)]
                 } else {
                   A.range = A.feasible[A.cnstr.func(A.feasible, x[x.select])]
@@ -415,7 +415,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
             S.est = foreach(i=1:nrow(X.tr), .packages=c("ranger"), .combine = f(nrow(X.tr))) %dopar% {
               # find proper A.range if there is any constraint on A given X/Y
               if (is.function(A.cnstr.func)) {
-                if (is.null(x.list)) {
+                if (is.null(x.select)) {
                   A.range = A.feasible[A.cnstr.func(A.feasible, X.tr[i,])]
                 } else {
                   A.range = A.feasible[A.cnstr.func(A.feasible, X.tr[i,x.select])]
@@ -508,7 +508,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
             S.est = pbapply(X.tr, 1, function(x) {
               # find proper A.range if there is any constraint on A given X/Y
               if (is.function(A.cnstr.func)) {
-                if (is.null(x.list)) {
+                if (is.null(x.select)) {
                   A.range = A.feasible[A.cnstr.func(A.feasible, x)]
                 } else {
                   A.range = A.feasible[A.cnstr.func(A.feasible, x[x.select])]
@@ -534,7 +534,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
             S.est = foreach(i=1:nrow(X.tr), .packages=c("glmnet"), .combine = f(nrow(X.tr))) %dopar% {
               # find proper A.range if there is any constraint on A given X/Y
               if (is.function(A.cnstr.func)) {
-                if (is.null(x.list)) {
+                if (is.null(x.select)) {
                   A.range = A.feasible[A.cnstr.func(A.feasible, X.tr[i,])]
                 } else {
                   A.range = A.feasible[A.cnstr.func(A.feasible, X.tr[i,x.select])]
