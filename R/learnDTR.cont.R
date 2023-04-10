@@ -106,7 +106,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
         stop("A.box.cnstr does not have proper number of list elements!")
       }
     } else {
-      A.list = rep(list(A.box.cnstr), 4)
+      A.list = rep(list(A.box.cnstr), length(X))
     }
   }
 
