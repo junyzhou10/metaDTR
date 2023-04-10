@@ -201,11 +201,12 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
               } else {
                 A.ff = A.range
               }
+
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
                 } else {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
                 }
               }
 
@@ -222,9 +223,9 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
                 } else {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
                 }
               }
               dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
@@ -244,9 +245,9 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
                 } else {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
                 }
               }
               dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
@@ -262,9 +263,9 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
                 } else {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
                 }
               }
               dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
@@ -285,9 +286,9 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
                 } else {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
                 }
               }
               dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
@@ -305,9 +306,9 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
                 } else {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
                 }
               }
               dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
@@ -330,9 +331,9 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
                 } else {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
                 }
               }
               dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
@@ -349,9 +350,9 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
                 } else {
-                  A.ff = A.ff[A.cnstr.func(A.ff, X.te[i,x.select])]
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
                 }
               }
               dat.tmp = data.frame(trt = A.ff, outer(A.ff, as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))

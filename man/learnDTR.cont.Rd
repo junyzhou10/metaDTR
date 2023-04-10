@@ -56,8 +56,10 @@ A included}
 \item{include.Y}{0 for no past reward/outcome Y included in analysis; 1 for only last Y included; 2 for all past
 Y included}
 
-\item{parallel}{A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
-number of cores to use. Otherwise, directly use the number from \code{detectCores()}}
+\item{parallel}{A boolean, for whether parallel computing is adopted to speed up the "prediction" steps.
+It might induce certain connection issue with \code{glmnet}. But parallel is not really
+necessary. It does not impact training speed. Also, if a numeric value, it implies the
+number of cores to use. Otherwise, directly use the number from \code{detectCores()}.}
 
 \item{A.box.cnstr}{Box constraint for A. Default is \code{NULL}, which means no constraint on A
 and the feasible set of A will be implied from observed action values}
