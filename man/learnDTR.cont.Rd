@@ -14,8 +14,10 @@ learnDTR.cont(
   include.X = 0,
   include.A = 0,
   include.Y = 0,
-  est.sigma = NULL,
   parallel = FALSE,
+  A.box.cnstr = NULL,
+  A.cnstr.func = NULL,
+  x.select = NULL,
   n.grid = 100,
   verbose = TRUE,
   ...
@@ -54,12 +56,21 @@ A included}
 \item{include.Y}{0 for no past reward/outcome Y included in analysis; 1 for only last Y included; 2 for all past
 Y included}
 
-\item{est.sigma}{Initial estimation of sigma. Only for T-learner with BART. If sample size is not enough to estimate
-surface separately, or algorithm experience some trouble in getting sigma, use this argument to
-provide an initial estimate.}
-
 \item{parallel}{A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
 number of cores to use. Otherwise, directly use the number from \code{detectCores()}}
+
+\item{A.box.cnstr}{Box constraint for A. Default is \code{NULL}, which means no constraint on A
+and the feasible set of A will be implied from observed action values}
+
+\item{A.cnstr.func}{For other type of constraint applied to A, user can input a function here.
+The basic syntax is \code{function(A, X){...}}, with two arguments: A stands
+for action and X are covariates at that stage. For which covariates to select,
+use the argument \code{x.select}. The function should return a boolean,
+i.e., \code{TRUE} or \code{FALSE}. For example, if constraint is \eqn{3A-log(A)<5},
+then function is \code{function(A, X){3A-log(A)<5}}.}
+
+\item{x.select}{Covariate names or id (numeric). Default is \code{NULL} means either all variables are
+selected (if X is used in function \code{A.cnstr.func}) or X is not related to A's feasible set}
 
 \item{n.grid}{Number of grid used to search for the best treatment/action. Large values slow down the algorithm.}
 

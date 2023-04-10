@@ -36,7 +36,8 @@ Default is \code{NULL}.}
 \item{A.feasible}{Optional list, default is \code{NULL}. This allow user to specify the subject level's feasible action/treatment
 space. The length of list should be equal to the number of stages, and each element should be
 an N x 2 of matrix, where N represents the number of subjects and each row is the range of
-feasible action/treatment, i.e., (min, max).}
+feasible action/treatment, i.e., (min, max). If \code{A.cnstr.func} is specified in \code{\link[=learnDTR.cont]{learnDTR.cont()}},
+then feasible set will also be made to satisfy that.}
 
 \item{n.grid}{Same as in \code{\link[=learnDTR.cont]{learnDTR.cont()}}. If not specified, it will be inherited from \code{\link[=learnDTR.cont]{learnDTR.cont()}}.}
 
