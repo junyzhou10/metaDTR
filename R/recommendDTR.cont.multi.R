@@ -1,4 +1,4 @@
-#' @title Recommend the optimal treatment at each stage (Continuous Treatment & Multiple Outcomes)
+#' @title Recommend the optimal treatment at each stage (Continuous Treatment and Multiple Outcomes)
 #' @author Junyi Zhou \email{junyzhou@iu.edu}
 #' @description This function make recommendations of optimal treatment for a given subject at given stage
 #' @param DTRs Output from [learnDTR.cont.multi()] that belong to class \code{metaDTR}.
@@ -57,10 +57,10 @@
 #'                           },
 #'                           x.select = c("V1", "V2"),
 #'                           n.grid = 50,
-#'                           parallel = F)
+#'                           parallel = FALSE)
 #' ## Second: Find DTR on test set
 #' optDTR <- recommendDTR.cont.multi(DTRs, currentDTRs = NULL, n.grid = 50,
-#'                         X.new = tmp$X.test, parallel = F, verbose = TRUE)
+#'                         X.new = tmp$X.test, parallel = FALSE, verbose = TRUE)
 #' @import dbarts glmnet ranger xgboost pbapply doParallel snow utils foreach
 #' @export
 #' @seealso \code{\link{learnDTR.cont.multi}}

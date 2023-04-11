@@ -2,7 +2,7 @@
 % Please edit documentation in R/recommendDTR.cont.multi.R
 \name{recommendDTR.cont.multi}
 \alias{recommendDTR.cont.multi}
-\title{Recommend the optimal treatment at each stage (Continuous Treatment & Multiple Outcomes)}
+\title{Recommend the optimal treatment at each stage (Continuous Treatment and Multiple Outcomes)}
 \usage{
 recommendDTR.cont.multi(
   DTRs,
@@ -90,10 +90,10 @@ DTRs = learnDTR.cont.multi(X = tmp$X,
                           },
                           x.select = c("V1", "V2"),
                           n.grid = 50,
-                          parallel = F)
+                          parallel = FALSE)
 ## Second: Find DTR on test set
 optDTR <- recommendDTR.cont.multi(DTRs, currentDTRs = NULL, n.grid = 50,
-                        X.new = tmp$X.test, parallel = F, verbose = TRUE)
+                        X.new = tmp$X.test, parallel = FALSE, verbose = TRUE)
 }
 \seealso{
 \code{\link{learnDTR.cont.multi}}

@@ -1,4 +1,4 @@
-#' @title Learning DTR from Sequential Interventions (Continuous Treatment & Multiple outcomes)
+#' @title Learning DTR from Sequential Interventions (Continuous Treatment and Multiple outcomes)
 #' @author Junyi Zhou \email{junyzhou@iu.edu}
 #' @description This function supports to learn the optimal sequential decision rules from either randomized studies
 #'              or observational ones. This function support continuous treatment/action values and multiple
@@ -90,7 +90,7 @@
 #'                           },
 #'                           x.select = c("V1", "V2"),
 #'                           n.grid = 50,
-#'                           parallel = F)
+#'                           parallel = FALSE)
 #'
 #' @references
 #' Künzel, Sören R., Jasjeet S. Sekhon, Peter J. Bickel, and Bin Yu.

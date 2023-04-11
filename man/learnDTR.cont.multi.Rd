@@ -2,7 +2,7 @@
 % Please edit documentation in R/learnDTR.cont.multi.R
 \name{learnDTR.cont.multi}
 \alias{learnDTR.cont.multi}
-\title{Learning DTR from Sequential Interventions (Continuous Treatment & Multiple outcomes)}
+\title{Learning DTR from Sequential Interventions (Continuous Treatment and Multiple outcomes)}
 \usage{
 learnDTR.cont.multi(
   X,
@@ -136,7 +136,7 @@ DTRs = learnDTR.cont.multi(X = tmp$X,
                           },
                           x.select = c("V1", "V2"),
                           n.grid = 50,
-                          parallel = F)
+                          parallel = FALSE)
 
 }
 \references{
