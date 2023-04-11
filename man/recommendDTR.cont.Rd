@@ -11,7 +11,8 @@ recommendDTR.cont(
   A.new = NULL,
   Y.new = NULL,
   A.feasible = NULL,
-  n.grid = NULL,
+  A.cnstr.func = NULL,
+  n.grid = 100,
   parallel = FALSE,
   verbose = NULL
 )
@@ -39,6 +40,9 @@ an N x 2 of matrix, where N represents the number of subjects and each row is th
 feasible action/treatment, i.e., (min, max). If \code{A.cnstr.func} is specified in \code{\link[=learnDTR.cont]{learnDTR.cont()}},
 then feasible set will also be made to satisfy that.}
 
+\item{A.cnstr.func}{Same as in \code{\link[=learnDTR.cont]{learnDTR.cont()}}. Provide a chance for it to be override, not very common though.
+If not specified, it will be inherited directly from the returns of \code{\link[=learnDTR.cont]{learnDTR.cont()}}.}
+
 \item{n.grid}{Same as in \code{\link[=learnDTR.cont]{learnDTR.cont()}}. If not specified, it will be inherited from \code{\link[=learnDTR.cont]{learnDTR.cont()}}.}
 
 \item{parallel}{A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
@@ -61,10 +65,7 @@ this package. User can provide available information stage by stage, and obtain 
 at each stage, iteratively.
 }
 \examples{
-## To see details of applying this function to obtain optimal DTR on new dataset, please
-##   refer to author's post: https://jzhou.org/posts/optdtr/
-## In this very special case, since covariates X are independent of previous A and Y,
-## the optimal DTR can be found at beginning with following code:
+## Similar example as recommendDTR()
 DTRs = learnDTR.cont(X = ThreeStg_Dat$X,
                      A = ThreeStg_Dat$A,
                      Y = ThreeStg_Dat$Y,

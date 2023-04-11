@@ -1,7 +1,8 @@
-#' @title Learning DTR from Sequential Interventions (Continuous Treatment)
+#' @title Learning DTR from Sequential Interventions (Continuous Treatment & Multiple outcomes)
 #' @author Junyi Zhou \email{junyzhou@iu.edu}
 #' @description This function supports to learn the optimal sequential decision rules from either randomized studies
-#'              or observational ones. Multiple treatment options are supported.
+#'              or observational ones. This function support continuous treatment/action values and multiple
+#'              outcomes.
 #' @param X A list of information available at each stage in order, that is, \code{X[[1]]} represents the baseline information,
 #'          and \code{X[[t]]} is the information observed before \eqn{t^{th}} intervention.
 #'          The dimensionality of each element \code{X[[i]]} can be different from each other.
@@ -10,10 +11,16 @@
 #'          However, if argument \code{all.inclusive} is \code{TRUE}, all previous stages' \code{X}, \code{A},
 #'          and \code{Y} will be used in training. So, in that case, \code{X} should not involve action and reward
 #'          information.
-#' @param A A list of actions taken during the sequential studies. The order should match with that of \code{X}
+#' @param A A list of actions taken during the sequential studies. The order should match with that of \code{X}.
+#'          Each element is suppose to be a Nxk matrix, where N is the total number of subjects and
+#'          k<=p is the number of actions.
 #' @param Y A list of outcomes observed in the sequential studies. The order should match with that of \code{X}.
 #'          \code{Y[[t]]} is suppose to be driven by the \code{X[[t]]} and action \code{A[[t]]}.
+#'          Each element is suppose to be a Nxp matrix, where N is the total number of subjects and
+#'          p is the number of outcomes.
 #' @param weights Weights on each stage of rewards. Default is all 1.
+#' @param weights.Y The weights for various outcomes. The length should be p. Default is \code{NULL} indicating equal
+#'                  weights for each outcome.
 #' @param baseLearner Choose one baselearner for meta-learn er algorithms. So far, it supports \code{BART} by
 #'                    package \code{dbarts}, \code{RF} (random forests) by \code{ranger}, \code{XGBoost} by
 #'                    package \code{xgboost}, and \code{GAM} (generalized additive model)
@@ -30,7 +37,8 @@
 #'                 necessary. It does not impact training speed. Also, if a numeric value, it implies the
 #'                 number of cores to use. Otherwise, directly use the number from `detectCores()`.
 #' @param A.box.cnstr Box constraint for A. Default is \code{NULL}, which means no constraint on A
-#'                    and the feasible set of A will be implied from observed action values
+#'                    and the feasible set of A will be implied from observed action values. If there are
+#'                    k treatment/action, element should be a 2xk matrix
 #' @param A.cnstr.func For other type of constraint applied to A, user can input a function here.
 #'                     The basic syntax is \code{function(A, X){...}}, with two arguments: A stands
 #'                     for action and X are covariates at that stage. For which covariates to select,
@@ -44,31 +52,46 @@
 #' @param ... Additional arguments that can be passed to \code{dbarts::bart}, \code{ranger::ranger},
 #'            \code{params} of \code{xbgoost::xgb.cv}, or \code{glmnet::cv.glmnet}
 #' @details This function supports to find the optimal dynamic treatment regime (DTR) for either randomized experiments
-#'          or observational studies. Also, thanks to meta-learner structure, S-, T-, and deC-learner can naturally
-#'          support multiple action options at any stage. \cr
-#'          \cr
-#'          For \code{GAM}, the algorithm will not automatically project the covariates \code{X} or outcomes/rewards
-#'          \code{Y} onto any bases-spanned spaces. User shall transform the covariates and/or  outcomes/rewards
-#'          manually and then input the desired design matrix through inputs \code{X} and/or \code{Y}.\cr
+#'          or observational studies. Similar to [learnDTR.cont], it supports continuous treatment actions. Moreover,
+#'          it allows for multiple outcomes. The objective to maximize turns to be \eqn{w_1y_1 + w_2y_2} given two
+#'          outcomes situation and \eqn{w_1} and \eqn{w_2} are coming from input \code{weights.Y}.
+#'          Notably, since multiple outcomes, there are also multiple treatment/actions at each stage
+#'          corresponding to each outcome.\cr
 #'          \cr
 #'          It is strongly suggested to adopt BART over random forests as baselearner if sample size is small.
 #'
 #' @return It includes learning results, basically, the trained functions that can be used for predictions. Since
-#'         sequential recommendations might require intermediate observations, [learnDTR.cont] will not automatically
-#'         provide prediction. But by another function [recommendDTR.cont],
+#'         sequential recommendations might require intermediate observations, [learnDTR.cont.multi] will not automatically
+#'         provide prediction. But by another function [recommendDTR.cont.multi],
 #'         predictions can flexibly been made stage by stage.
-#' @examples
-#' ## Though ThreeStg_Dat does not have continuous treatment, still we can use it as an example
-#' DTRs = learnDTR.cont(X = ThreeStg_Dat$X,
-#'                      A = ThreeStg_Dat$A,
-#'                      Y = ThreeStg_Dat$Y,
-#'                      weights = rep(1, 3),
-#'                      baseLearner  = c("BART"),
-#'                      metaLearners = c("S"),
-#'                      include.X = 1,
-#'                      include.A = 2,
-#'                      include.Y = 0)
 #' @import stats utils dbarts glmnet ranger xgboost pbapply doParallel snow foreach
+#' @examples
+#' ## Modify dataset to 2 actions and 2 outcomes:
+#' tmp = ThreeStg_Dat
+#' tmp$X = lapply(tmp$X, function(x) as.data.frame(apply(x, 2, scale)))
+#' tmp$X.test = lapply(tmp$X.test, function(x) as.data.frame(apply(x, 2, scale)))
+#' tmp$A = lapply(tmp$A, function(x) cbind(rnorm(400,0,1), rnorm(400,0,2)))
+#' tmp$Y = lapply(tmp$Y, function(x) cbind(x, rnorm(400,0,0.2)+x*runif(400,0,1)))
+#'
+#' ## Apply the main function to learn the DTRs
+#' DTRs = learnDTR.cont.multi(X = tmp$X,
+#'                           A = tmp$A,
+#'                           Y = tmp$Y,
+#'                           weights = rep(1, 3),
+#'                           weights.Y = c(0.3,0.7),
+#'                           baseLearner  = c("XGBoost"),
+#'                           metaLearners = c("S"),
+#'                           include.X = 1,
+#'                           include.A = 2,
+#'                           include.Y = 0,
+#'                           A.box.cnstr = cbind(c(-2,2), c(-2,2)),
+#'                           A.cnstr.func = function(a, x) {
+#'                             abs(a[,1]+x[,1]) + abs(a[,2]+x[,2]) <= 3
+#'                           },
+#'                           x.select = c("V1", "V2"),
+#'                           n.grid = 50,
+#'                           parallel = F)
+#'
 #' @references
 #' Künzel, Sören R., Jasjeet S. Sekhon, Peter J. Bickel, and Bin Yu.
 #' "Metalearners for estimating heterogeneous treatment effects using machine learning."
@@ -77,30 +100,38 @@
 #' Zhou, Junyi, Ying Zhang, and Wanzhu Tu. "A reference-free R-learner for treatment recommendation."
 #' *Statistical Methods in Medical Research* (2022)
 #' @export
-#' @seealso \code{\link{recommendDTR.cont}}
+#' @seealso \code{\link{recommendDTR.cont.multi}}
 
-learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
-                          baseLearner  = c("RF", "BART", "XGBoost", "GAM"),
-                          metaLearners = c("S"),
-                          include.X = 0, include.A = 0, include.Y = 0,
-                          parallel = FALSE,
-                          A.box.cnstr = NULL,
-                          A.cnstr.func = NULL,
-                          x.select = NULL,
-                          n.grid = 100,
-                          verbose = TRUE, ...
+learnDTR.cont.multi <- function(X, A, Y,
+                                weights = NULL,
+                                weights.Y = NULL,
+                                baseLearner  = c("RF", "BART", "XGBoost", "GAM"),
+                                metaLearners = c("S"),
+                                include.X = 0, include.A = 0, include.Y = 0,
+                                parallel = FALSE,
+                                A.box.cnstr = NULL,
+                                A.cnstr.func = NULL,
+                                x.select = NULL,
+                                n.grid = 100,
+                                verbose = TRUE, ...
 ) {
   n.stage = length(X)
+  Store.NAME = list()
   ######==================== check inputs ====================
   if (length(unique(length(X), length(A), length(Y))) != 1){
     stop("Inconsistent input of X, A, and Y. Please check!\n")
   }
+  if (is.null(weights)) {
+    weights = rep(1, length(X))
+  }
+  if (is.null(weights.Y)) {
+    weights.Y = rep(1, ncol(A[[1]]))
+  }
 
 
-
-  A <- lapply(A, as.numeric)
+  A <- lapply(A, as.matrix)
   if (is.null(A.box.cnstr)) {
-    A.list <- lapply(A, function(x) range(x))
+    A.list <- lapply(A, function(x) apply(x, 2, range)) # a list, each element is 2xp(k) matrix
   } else {
     if (is.list(A.box.cnstr)) {
       if (length(A.box.cnstr)!=length(X)) {
@@ -194,16 +225,23 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
           }
         }
 
-        A.tr = A[[stage]]
-        Y.tr = Y[[stage]]
-        A.feasible = seq(min(A.list[[stage]]), max(A.list[[stage]]), length.out = n.grid)
-        V.est = V.est + Y.tr*weights[stage]
-        ## generate data set for S-learner:
-        dat.tmp = data.frame(trt = A.tr, X.tr)
+        ## key different when generating feasible A set
+        A.tr = as.matrix(A[[stage]])
+        Y.tr = as.matrix(Y[[stage]])
+        A.feasible = do.call(expand.grid,
+                             apply(A.tr, 2, function(x) seq(min(x), max(x), length.out = n.grid), simplify = FALSE)
+        )
+        V.est = V.est + colSums(weights.Y * t(Y.tr))*weights[stage]
+        ## construct training dataset with interactions
+        dat.tmp = NULL
+        for (p in 1:ncol(A.tr)) {
+          dat.tmp = cbind(dat.tmp, stats::model.matrix(~trt*.-1, data.frame(trt = A.tr[,p], X.tr)))
+        }
         store.names = colnames(dat.tmp)
+
         ## train by bart/xgboost:
         if (baseLearner[1] == "BART") {
-          S.fit = bart(x.train = stats::model.matrix(~trt*.-1, dat.tmp), y.train = V.est, keeptrainfits = F,
+          S.fit = bart(x.train = dat.tmp, y.train = V.est, keeptrainfits = F,
                        keeptrees = TRUE, verbose = FALSE, ...)
           remove(dat.tmp)
 
@@ -217,16 +255,21 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
                 # find proper A.range if there is any constraint on A given X/Y
                 if (is.function(A.cnstr.func)) {
                   if (is.null(x.select)) {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) )])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
                   } else {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) )])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
                   }
                 } else {
                   A.range = A.feasible
                 }
 
-                dat.tmp = data.frame(trt = A.range, outer(rep(1, length(A.range)), as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
-                return( max(colMeans(predict(S.fit, newdata = stats::model.matrix(~trt*.-1, dat.tmp)))) )
+                dat.tmp = NULL
+                for (p in 1:ncol(A.range)) {
+                  dat.tmp = cbind(dat.tmp,
+                                  stats::model.matrix(~trt*.-1, data.frame(trt = A.range[,p], outer(rep(1,nrow(A.range)), as.numeric(X.tr[i,])) )))
+                }
+                colnames(dat.tmp) <- store.names
+                return( max(colMeans(predict(S.fit, newdata = dat.tmp))) )
               })
             } else {
               ## register cores
@@ -244,16 +287,21 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
                 # find proper A.range if there is any constraint on A given X/Y
                 if (is.function(A.cnstr.func)) {
                   if (is.null(x.select)) {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) )])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
                   } else {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) )])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
                   }
                 } else {
                   A.range = A.feasible
                 }
 
-                dat.tmp = data.frame(trt = A.range, outer(rep(1, length(A.range)), as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
-                return( max(colMeans(predict(S.fit, newdata = stats::model.matrix(~trt*.-1, dat.tmp)))) )
+                dat.tmp = NULL
+                for (p in 1:ncol(A.range)) {
+                  dat.tmp = cbind(dat.tmp,
+                                  stats::model.matrix(~trt*.-1, data.frame(trt = A.range[,p], outer(rep(1,nrow(A.range)), as.numeric(X.tr[i,])) )))
+                }
+                colnames(dat.tmp) <- store.names
+                return( max(colMeans(predict(S.fit, newdata = dat.tmp))) )
               } # should be n.grid x nrow(X.tr)
 
               ## Stop the cluster
@@ -262,7 +310,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
           }
         }
         if (baseLearner[1] == "XGBoost") {
-          dtrain <- xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp), label = V.est)
+          dtrain <- xgb.DMatrix(data = dat.tmp, label = V.est)
           remove(dat.tmp)
           xgbcv <- xgb.cv( params = params.list, data = dtrain,
                            nrounds = ifelse("nrounds" %in% names(params.cv.tr), params.cv.tr[['nrounds']], 500),
@@ -285,16 +333,21 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
                 # find proper A.range if there is any constraint on A given X/Y
                 if (is.function(A.cnstr.func)) {
                   if (is.null(x.select)) {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) )])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
                   } else {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) )])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
                   }
                 } else {
                   A.range = A.feasible
                 }
 
-                dat.tmp = data.frame(trt = A.range, outer(rep(1, length(A.range)), as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
-                return( max(predict( S.fit, xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp) ) )) )
+                dat.tmp = NULL
+                for (p in 1:ncol(A.range)) {
+                  dat.tmp = cbind(dat.tmp,
+                                  stats::model.matrix(~trt*.-1, data.frame(trt = A.range[,p], outer(rep(1,nrow(A.range)), as.numeric(X.tr[i,])) )))
+                }
+                colnames(dat.tmp) <- store.names
+                return( max(predict( S.fit, xgb.DMatrix(data = dat.tmp ) )) )
               }) # should be n.grid x nrow(X.tr)
             } else {
               ## register cores
@@ -312,15 +365,21 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
                 # find proper A.range if there is any constraint on A given X/Y
                 if (is.function(A.cnstr.func)) {
                   if (is.null(x.select)) {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) )])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
                   } else {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) )])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
                   }
                 } else {
                   A.range = A.feasible
                 }
-                dat.tmp = data.frame(trt = A.range, outer(rep(1, length(A.range)), as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
-                return( max(predict( S.fit, xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp) ) )))
+
+                dat.tmp = NULL
+                for (p in 1:ncol(A.range)) {
+                  dat.tmp = cbind(dat.tmp,
+                                  stats::model.matrix(~trt*.-1, data.frame(trt = A.range[,p], outer(rep(1,nrow(A.range)), as.numeric(X.tr[i,])) )))
+                }
+                colnames(dat.tmp) <- store.names
+                return( max(predict( S.fit, xgb.DMatrix(data = dat.tmp) )))
               } # should be n.grid x nrow(X.tr)
 
               #Stop the cluster
@@ -334,6 +393,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
         suppressWarnings(remove("S.est", "dat.train", "dat.test"))
         ## Store the trained learners
         S.learners = c(S.learners, list(S.fit))
+        Store.NAME = c(list(store.names), Store.NAME)
         remove("S.fit")
         gc(verbose = FALSE)
       }
@@ -383,12 +443,18 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
           }
         }
 
-        A.tr = A[[stage]]
-        Y.tr = Y[[stage]]
-        A.feasible = seq(min(A.list[[stage]]), max(A.list[[stage]]), length.out = n.grid)
-        V.est = V.est + Y.tr*weights[stage]
-        ## generate data set for S-learner:
-        dat.tmp = stats::model.matrix(~trt*.-1, data.frame(trt = A.tr, X.tr))
+        ## key different when generating feasible A set
+        A.tr = as.matrix(A[[stage]])
+        Y.tr = as.matrix(Y[[stage]])
+        A.feasible = do.call(expand.grid,
+                             apply(A.tr, 2, function(x) seq(min(x), max(x), length.out = n.grid), simplify = FALSE)
+        )
+        V.est = V.est + colSums(weights.Y * t(Y.tr))*weights[stage]
+        ## construct training dataset with interactions
+        dat.tmp = NULL
+        for (p in 1:ncol(A.tr)) {
+          dat.tmp = cbind(dat.tmp, stats::model.matrix(~trt*.-1, data.frame(trt = A.tr[,p], X.tr)))
+        }
         store.names = colnames(dat.tmp)
 
         ## train by ranger:
@@ -403,16 +469,20 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
               # find proper A.range if there is any constraint on A given X/Y
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) )])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
                 } else {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) )])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
                 }
               } else {
                 A.range = A.feasible
               }
 
-              dat.tmp = data.frame(trt = A.range, outer(rep(1, length(A.range)), as.numeric(X.tr[i,]))); colnames(dat.tmp) <- c("trt", colnames(X.tr))
-              dat.tmp = stats::model.matrix(~trt*.-1, dat.tmp)
+              dat.tmp = NULL
+              for (p in 1:ncol(A.range)) {
+                dat.tmp = cbind(dat.tmp,
+                                stats::model.matrix(~trt*.-1, data.frame(trt = A.range[,p], outer(rep(1,nrow(A.range)), as.numeric(X.tr[i,])) )))
+              }
+              colnames(dat.tmp) <- store.names
               return( max(predict(S.fit, data = data.frame(dat.tmp))$predictions))
             }) # should be n.grid x nrow(X.tr)
           } else {
@@ -431,15 +501,19 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
               # find proper A.range if there is any constraint on A given X/Y
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) )])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
                 } else {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) )])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
                 }
               } else {
                 A.range = A.feasible
               }
-              dat.tmp = data.frame(trt = A.range, outer(rep(1, length(A.range)), as.numeric(X.tr[i,]))); colnames(dat.tmp) <- c("trt", colnames(X.tr))
-              dat.tmp = stats::model.matrix(~trt*.-1, dat.tmp)
+              dat.tmp = NULL
+              for (p in 1:ncol(A.range)) {
+                dat.tmp = cbind(dat.tmp,
+                                stats::model.matrix(~trt*.-1, data.frame(trt = A.range[,p], outer(rep(1,nrow(A.range)), as.numeric(X.tr[i,])) )))
+              }
+              colnames(dat.tmp) <- store.names
               return( max(predict(S.fit, data = data.frame(dat.tmp))$predictions))
             } # should be n.grid x nrow(X.tr)
 
@@ -454,6 +528,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
         suppressWarnings(remove("S.est", "dat.train", "dat.test"))
         ## Store the trained learners
         S.learners = c(S.learners, list(S.fit))
+        Store.NAME = c(list(store.names), Store.NAME)
         remove("S.fit")
         gc(verbose = FALSE)
       }
@@ -504,12 +579,18 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
           }
         }
 
-        A.tr = A[[stage]]
-        Y.tr = Y[[stage]]
-        A.feasible = seq(min(A.list[[stage]]), max(A.list[[stage]]), length.out = n.grid)
-        V.est = V.est + Y.tr*weights[stage]
-        ## generate data set for S-learner:
-        dat.tmp = data.frame(trt = A.tr, X.tr)
+        ## key different when generating feasible A set
+        A.tr = as.matrix(A[[stage]])
+        Y.tr = as.matrix(Y[[stage]])
+        A.feasible = do.call(expand.grid,
+                             apply(A.tr, 2, function(x) seq(min(x), max(x), length.out = n.grid), simplify = FALSE)
+        )
+        V.est = V.est + colSums(weights.Y * t(Y.tr))*weights[stage]
+        ## construct training dataset with interactions
+        dat.tmp = NULL
+        for (p in 1:ncol(A.tr)) {
+          dat.tmp = cbind(dat.tmp, stats::model.matrix(~trt*.-1, data.frame(trt = A.tr[,p], X.tr)))
+        }
         store.names = colnames(dat.tmp)
 
         ## train by glmnet with LASSO penalty:
@@ -518,7 +599,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
         } else {
           doParallel::registerDoParallel(detectCores())
         }
-        S.fit = cv.glmnet(stats::model.matrix(~trt*.-1, dat.tmp), V.est, family = "gaussian", parallel = TRUE, ...)
+        S.fit = cv.glmnet(dat.tmp, V.est, family = "gaussian", parallel = TRUE, ...)
         if (verbose) {
           print(paste0(Sys.time(), ": Fitting part done!! Next is doing some estimation jobs for next stage."))
         }
@@ -529,16 +610,21 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
               # find proper A.range if there is any constraint on A given X/Y
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) )])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
                 } else {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) )])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
                 }
               } else {
                 A.range = A.feasible
               }
 
-              dat.tmp = data.frame(trt = A.range, outer(rep(1, length(A.range)), as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
-              return( max(predict(S.fit, newx = stats::model.matrix(~trt*.-1, dat.tmp), type = "response", s = "lambda.min")))
+              dat.tmp = NULL
+              for (p in 1:ncol(A.range)) {
+                dat.tmp = cbind(dat.tmp,
+                                stats::model.matrix(~trt*.-1, data.frame(trt = A.range[,p], outer(rep(1,nrow(A.range)), as.numeric(X.tr[i,])) )))
+              }
+              colnames(dat.tmp) <- store.names
+              return( max(predict(S.fit, newx = dat.tmp, type = "response", s = "lambda.min")))
             }) # should be n.grid x nrow(X.tr)
           } else {
             ## register cores
@@ -556,15 +642,20 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
               # find proper A.range if there is any constraint on A given X/Y
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) )])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
                 } else {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) )])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
                 }
               } else {
                 A.range = A.feasible
               }
-              dat.tmp = data.frame(trt = A.range, outer(rep(1, length(A.range)), as.numeric(X.tr[i,]))); colnames(dat.tmp) <- store.names
-              return( max(predict(S.fit, newx = stats::model.matrix(~trt*.-1, dat.tmp), type = "response", s = "lambda.min")))
+              dat.tmp = NULL
+              for (p in 1:ncol(A.range)) {
+                dat.tmp = cbind(dat.tmp,
+                                stats::model.matrix(~trt*.-1, data.frame(trt = A.range[,p], outer(rep(1,nrow(A.range)), as.numeric(X.tr[i,])) )))
+              }
+              colnames(dat.tmp) <- store.names
+              return( max(predict(S.fit, newx = dat.tmp, type = "response", s = "lambda.min")))
             } # should be n.grid x nrow(X.tr)
 
             #Stop the cluster
@@ -576,6 +667,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
         if (stage>1) {V.est = as.vector(S.est)}
         ## Store the trained learners
         S.learners = c(S.learners, list(S.fit))
+        Store.NAME = c(list(store.names), Store.NAME)
       }
       names(S.learners) <- paste("S", seq(n.stage, by = -1), sep = ".")
       if (verbose) {
@@ -598,6 +690,7 @@ learnDTR.cont <- function(X, A, Y, weights = rep(1, length(X)),
                    A.cnstr.func = A.cnstr.func,
                    x.select = x.select,
                    n.grid = n.grid,
+                   store.names = Store.NAME,
                    verbose = verbose
                  )
   )

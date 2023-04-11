@@ -1,8 +1,8 @@
-#' @title Recommend the optimal treatment at each stage (Continuous Treatment)
+#' @title Recommend the optimal treatment at each stage (Continuous Treatment & Multiple Outcomes)
 #' @author Junyi Zhou \email{junyzhou@iu.edu}
 #' @description This function make recommendations of optimal treatment for a given subject at given stage
-#' @param DTRs Output from [learnDTR.cont()] that belong to class \code{metaDTR}.
-#' @param currentDTRs Object from [recommendDTR.cont()]. Records the results from previous stages so that users can
+#' @param DTRs Output from [learnDTR.cont.multi()] that belong to class \code{metaDTR}.
+#' @param currentDTRs Object from [recommendDTR.cont.multi()]. Records the results from previous stages so that users can
 #'                    flexibly make predictions stage by stage. See details and example.
 #' @param X.new A list of covariates at each stage. In practice, since recommendations are made
 #'              stage by stage, here one stage of \code{X.new} will provide one stage's recommendation of action.
@@ -11,21 +11,21 @@
 #'              It allows to handle cases that the realized action/observation may not be consistent
 #'              with algorithm results. Only needed when \code{all.inclusive = TRUE}.
 #'              Default is \code{NULL}.
-#' @param Y.new A list. Required if \code{include.Y > 0} in [learnDTR.cont()]. Default is \code{NULL}
+#' @param Y.new A list. Required if \code{include.Y > 0} in [learnDTR.cont.multi()]. Default is \code{NULL}
 #' @param A.feasible Optional list, default is \code{NULL}. This allow user to specify the subject level's feasible action/treatment
 #'                   space. The length of list should be equal to the number of stages, and each element should be
 #'                   an N x 2 of matrix, where N represents the number of subjects and each row is the range of
-#'                   feasible action/treatment, i.e., (min, max). If \code{A.cnstr.func} is specified in [learnDTR.cont()],
+#'                   feasible action/treatment, i.e., (min, max). If \code{A.cnstr.func} is specified in [learnDTR.cont.multi()],
 #'                   then feasible set will also be made to satisfy that.
-#' @param A.cnstr.func Same as in [learnDTR.cont()]. Provide a chance for it to be override, not very common though.
-#'                     If not specified, it will be inherited directly from the returns of [learnDTR.cont()].
-#' @param n.grid Same as in [learnDTR.cont()]. If not specified, it will be inherited from [learnDTR.cont()].
+#' @param A.cnstr.func Same as in [learnDTR.cont.multi()]. Provide a chance for it to be override, not very common though.
+#'                     If not specified, it will be inherited directly from the returns of [learnDTR.cont.multi()].
+#' @param n.grid Same as in [learnDTR.cont.multi()]. If not specified, it will be inherited from [learnDTR.cont.multi()].
 #' @param parallel A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
-#'                 number of cores to use. Otherwise, directly use the number from [learnDTR.cont()]
+#'                 number of cores to use. Otherwise, directly use the number from [learnDTR.cont.multi()]
 #' @param verbose Console output allowed? Default is \code{NULL}, which will inherit the argument input of
-#' @details This function make recommendations based on the trained learners from [learnDTR.cont()] for new dataset.
+#' @details This function make recommendations based on the trained learners from [learnDTR.cont.multi()] for new dataset.
 #'          Since in real application, later stage covariates/outcomes are unobservable until treatments are
-#'          assigned. So in most cases, [recommendDTR.cont()] needs to be applied stage by stage, which is allowed in
+#'          assigned. So in most cases, [recommendDTR.cont.multi()] needs to be applied stage by stage, which is allowed in
 #'          this package. User can provide available information stage by stage, and obtain the optimal recommendations
 #'          at each stage, iteratively.
 #'
@@ -33,22 +33,39 @@
 #'         each meta-learner method.
 #' @examples
 #' ## Similar example as recommendDTR()
-#' DTRs = learnDTR.cont(X = ThreeStg_Dat$X,
-#'                      A = ThreeStg_Dat$A,
-#'                      Y = ThreeStg_Dat$Y,
-#'                      weights = rep(1, 3),
-#'                      baseLearner  = c("RF"),
-#'                      metaLearners = c("S"),
-#'                      include.X = 1,
-#'                      include.A = 2,
-#'                      include.Y = 0)
-#' optDTR <- recommendDTR.cont(DTRs, currentDTRs = NULL,
-#'                             X.new = ThreeStg_Dat$X.test)
+#' ## First: Modify dataset to 2 actions and 2 outcomes:
+#' tmp = ThreeStg_Dat
+#' tmp$X = lapply(tmp$X, function(x) as.data.frame(apply(x, 2, scale)))
+#' tmp$X.test = lapply(tmp$X.test, function(x) as.data.frame(apply(x, 2, scale)))
+#' tmp$A = lapply(tmp$A, function(x) cbind(rnorm(400,0,1), rnorm(400,0,2)))
+#' tmp$Y = lapply(tmp$Y, function(x) cbind(x, rnorm(400,0,0.2)+x*runif(400,0,1)))
+#'
+#' ## Apply the main function to learn the DTRs
+#' DTRs = learnDTR.cont.multi(X = tmp$X,
+#'                           A = tmp$A,
+#'                           Y = tmp$Y,
+#'                           weights = rep(1, 3),
+#'                           weights.Y = c(0.3,0.7),
+#'                           baseLearner  = c("XGBoost"),
+#'                           metaLearners = c("S"),
+#'                           include.X = 1,
+#'                           include.A = 2,
+#'                           include.Y = 0,
+#'                           A.box.cnstr = cbind(c(-2,2), c(-2,2)),
+#'                           A.cnstr.func = function(a, x) {
+#'                             abs(a[,1]+x[,1]) + abs(a[,2]+x[,2]) <= 3
+#'                           },
+#'                           x.select = c("V1", "V2"),
+#'                           n.grid = 50,
+#'                           parallel = F)
+#' ## Second: Find DTR on test set
+#' optDTR <- recommendDTR.cont.multi(DTRs, currentDTRs = NULL, n.grid = 50,
+#'                         X.new = tmp$X.test, parallel = F, verbose = TRUE)
 #' @import dbarts glmnet ranger xgboost pbapply doParallel snow utils foreach
 #' @export
-#' @seealso \code{\link{learnDTR.cont}}
+#' @seealso \code{\link{learnDTR.cont.multi}}
 
-recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
+recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
                               X.new, A.new = NULL, Y.new = NULL,
                               A.feasible = NULL,
                               A.cnstr.func = NULL,
@@ -60,6 +77,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
   include.X <- DTRs$controls$include.X
   include.Y <- DTRs$controls$include.Y
   include.A <- DTRs$controls$include.A
+  store.names <- DTRs$controls$store.names
   if (is.null(A.cnstr.func)) {
     A.cnstr.func <- DTRs$controls$A.cnstr.func
   }
@@ -91,7 +109,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
         count <<- count + length(list(...)) - 1
         setTxtProgressBar(pb, count)
         flush.console()
-        c(...) # this can feed into .combine option of foreach
+        cbind(...) # this can feed into .combine option of foreach
       }
     }
 
@@ -196,45 +214,60 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
         }
 
         ## predict outcome based on trained learners:
-        A.range = seq(min(A.list[[stage]]), max(A.list[[stage]]), length.out = n.grid)
+        A.range = do.call(expand.grid,
+                             apply(A.list[[stage]], 2, function(x) seq(min(x), max(x), length.out = n.grid), simplify = FALSE)
+        )
+        A.range = as.matrix(A.range)
+
         if (baseLearner == "BART") {
           if (parallel == FALSE) {
             A.pred = my.sapply(1:nrow(X.te), function(i) {
               if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
               } else {
                 A.ff = A.range
               }
 
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
                 } else {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select])), ])
                 }
               }
 
-              dat.tmp = data.frame(trt = A.ff, outer(rep(1, length(A.ff)), as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
-              Y.pred = colMeans(predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = stats::model.matrix(~trt*.-1, dat.tmp)))
-              return( A.ff[which.max(Y.pred)] )
+              dat.tmp = NULL
+              for (p in 1:ncol(A.range)) {
+                dat.tmp = cbind(dat.tmp,
+                                stats::model.matrix(~trt*.-1, data.frame(trt = A.ff[,p], outer(rep(1,nrow(A.ff)), as.numeric(X.te[i,])) )))
+              }
+              colnames(dat.tmp) = store.names[[stage]]
+              Y.pred = colMeans(predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = dat.tmp))
+              return( A.ff[which.max(Y.pred),] )
             })
           } else {
             A.pred = foreach(i=1:nrow(X.te), .packages=c("dbarts"), .combine = f(nrow(X.te))) %dopar% {
               if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
               } else {
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
                 } else {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select])), ])
                 }
               }
-              dat.tmp = data.frame(trt = A.ff, outer(rep(1, length(A.ff)), as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
-              Y.pred = colMeans(predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = stats::model.matrix(~trt*.-1, dat.tmp)))
-              return( A.ff[which.max(Y.pred)] )
+
+              dat.tmp = NULL
+              for (p in 1:ncol(A.range)) {
+                dat.tmp = cbind(dat.tmp,
+                                stats::model.matrix(~trt*.-1, data.frame(trt = A.ff[,p], outer(rep(1,nrow(A.ff)), as.numeric(X.te[i,])) )))
+              }
+              colnames(dat.tmp) = store.names[[stage]]
+              Y.pred = colMeans(predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = dat.tmp))
+              return( A.ff[which.max(Y.pred),] )
             }
           }
         }
@@ -243,38 +276,48 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
           if (parallel == FALSE) {
             A.pred = my.sapply(1:nrow(X.te), function(i) {
               if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
               } else {
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
                 } else {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select])), ])
                 }
               }
-              dat.tmp = data.frame(trt = A.ff, outer(rep(1, length(A.ff)), as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
-              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp)))
-              return( A.ff[which.max(Y.pred)] )
+              dat.tmp = NULL
+              for (p in 1:ncol(A.range)) {
+                dat.tmp = cbind(dat.tmp,
+                                stats::model.matrix(~trt*.-1, data.frame(trt = A.ff[,p], outer(rep(1,nrow(A.ff)), as.numeric(X.te[i,])) )))
+              }
+              colnames(dat.tmp) = store.names[[stage]]
+              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = xgb.DMatrix(data = dat.tmp))
+              return( A.ff[which.max(Y.pred),] )
             })
           } else {
             A.pred = foreach(i=1:nrow(X.te), .packages=c("xgboost"), .combine = f(nrow(X.te))) %dopar% {
               if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
               } else {
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
                 } else {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select])), ])
                 }
               }
-              dat.tmp = data.frame(trt = A.ff, outer(rep(1, length(A.ff)), as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
-              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = xgb.DMatrix(data = stats::model.matrix(~trt*.-1, dat.tmp)))
-              return( A.ff[which.max(Y.pred)] )
+              dat.tmp = NULL
+              for (p in 1:ncol(A.range)) {
+                dat.tmp = cbind(dat.tmp,
+                                stats::model.matrix(~trt*.-1, data.frame(trt = A.ff[,p], outer(rep(1,nrow(A.ff)), as.numeric(X.te[i,])) )))
+              }
+              colnames(dat.tmp) = store.names[[stage]]
+              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], newdata = xgb.DMatrix(data = dat.tmp))
+              return( A.ff[which.max(Y.pred),] )
             }
           }
         }
@@ -284,42 +327,50 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
           if (parallel == FALSE) {
             A.pred = my.sapply(1:nrow(X.te), function(i) {
               if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
               } else {
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
                 } else {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select])), ])
                 }
               }
-              dat.tmp = data.frame(trt = A.ff, outer(rep(1, length(A.ff)), as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
-              dat.tmp = stats::model.matrix(~trt*.-1, dat.tmp )
 
+              dat.tmp = NULL
+              for (p in 1:ncol(A.range)) {
+                dat.tmp = cbind(dat.tmp,
+                                stats::model.matrix(~trt*.-1, data.frame(trt = A.ff[,p], outer(rep(1,nrow(A.ff)), as.numeric(X.te[i,])) )))
+              }
+              colnames(dat.tmp) = store.names[[stage]]
               Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], data = data.frame(dat.tmp) )$predictions
-              return( A.ff[which.max(Y.pred)] )
+              return( A.ff[which.max(Y.pred),] )
             })
           } else {
             A.pred = foreach(i=1:nrow(X.te), .packages=c("ranger"), .combine = f(nrow(X.te))) %dopar% {
               if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
               } else {
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
                 } else {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select])), ])
                 }
               }
-              dat.tmp = data.frame(trt = A.ff, outer(rep(1, length(A.ff)), as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
-              dat.tmp = stats::model.matrix(~trt*.-1, dat.tmp )
 
+              dat.tmp = NULL
+              for (p in 1:ncol(A.range)) {
+                dat.tmp = cbind(dat.tmp,
+                                stats::model.matrix(~trt*.-1, data.frame(trt = A.ff[,p], outer(rep(1,nrow(A.ff)), as.numeric(X.te[i,])) )))
+              }
+              colnames(dat.tmp) = store.names[[stage]]
               Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], data = data.frame(dat.tmp) )$predictions
-              return( A.ff[which.max(Y.pred)] )
+              return( A.ff[which.max(Y.pred),] )
             }
           }
         }
@@ -329,47 +380,59 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
           if (parallel == FALSE) {
             A.pred = my.sapply(1:nrow(X.te), function(i) {
               if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
               } else {
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
                 } else {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select])), ])
                 }
               }
-              dat.tmp = data.frame(trt = A.ff, outer(rep(1, length(A.ff)), as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
-              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], newx = stats::model.matrix(~trt*.-1, dat.tmp),
+
+              dat.tmp = NULL
+              for (p in 1:ncol(A.range)) {
+                dat.tmp = cbind(dat.tmp,
+                                stats::model.matrix(~trt*.-1, data.frame(trt = A.ff[,p], outer(rep(1,nrow(A.ff)), as.numeric(X.te[i,])) )))
+              }
+              colnames(dat.tmp) = store.names[[stage]]
+              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], dat.tmp,
                                type = "response", s = "lambda.min")
-              return( A.ff[which.max(Y.pred)] )
+              return( A.ff[which.max(Y.pred),] )
             })
           } else {
             A.pred = foreach(i=1:nrow(X.te), .packages=c("glmnet"), .combine = f(nrow(X.te))) %dopar% {
               if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1])]
+                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
               } else {
                 A.ff = A.range
               }
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
                 } else {
-                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select]))])
+                  A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select])), ])
                 }
               }
-              dat.tmp = data.frame(trt = A.ff, outer(rep(1, length(A.ff)), as.numeric(X.te[i,]))); colnames(dat.tmp) = c("trt", colnames(X.te))
-              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], newx = stats::model.matrix(~trt*.-1, dat.tmp),
+
+              dat.tmp = NULL
+              for (p in 1:ncol(A.range)) {
+                dat.tmp = cbind(dat.tmp,
+                                stats::model.matrix(~trt*.-1, data.frame(trt = A.ff[,p], outer(rep(1,nrow(A.ff)), as.numeric(X.te[i,])) )))
+              }
+              colnames(dat.tmp) = store.names[[stage]]
+              Y.pred = predict(DTRs$S.learners[[n.stage - stage + 1]], newx = dat.tmp,
                                type = "response", s = "lambda.min")
-              return( A.ff[which.max(Y.pred)] )
+              return( A.ff[which.max(Y.pred),] )
             }
           }
         }
 
+        A.opt.S = c(A.opt.S, list(t(A.pred)))
+        A.new <- c(A.new, list(t(A.pred)))
 
-        A.opt.S = c(A.opt.S, list(A.pred))
-        A.new <- c(A.new, list(A.pred))
         if (verbose) {
           print(paste0(Sys.time(), ": Stage ", stage, " done!!"))
         }

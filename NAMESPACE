@@ -2,8 +2,10 @@
 
 export(learnDTR)
 export(learnDTR.cont)
+export(learnDTR.cont.multi)
 export(recommendDTR)
 export(recommendDTR.cont)
+export(recommendDTR.cont.multi)
 import(dbarts)
 import(doParallel)
 import(foreach)
