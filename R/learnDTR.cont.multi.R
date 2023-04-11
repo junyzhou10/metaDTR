@@ -213,14 +213,14 @@ learnDTR.cont.multi <- function(X, A, Y,
             X.tr = cbind(X.tr, A.tmp)
           } else if (include.A == 2) {
             A.tmp = do.call(cbind.data.frame, A[1:(stage-1)])
-            colnames(A.tmp) <- paste("A", 1:(stage-1), sep = ".")
+            colnames(A.tmp) <- paste("A", 1:ncol(A.tmp), sep = ".")
             X.tr = cbind(X.tr, A.tmp)
           }
           if (include.Y == 1) { # nothing need to do when include.Y == 0
-            Y.tmp = data.frame(Y = Y[[stage-1]]); colnames(Y.tmp) <- "y"
+            Y.tmp = data.frame(Y = Y[[stage-1]]); colnames(Y.tmp) <- paste("y", seq(ncol(Y.tmp)),sep = "_")
             X.tr = cbind(X.tr, Y.tmp)
           } else if (include.Y == 2) {
-            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), ncol = stage-1, byrow = FALSE)); colnames(Y.tmp) <- paste("y", seq(ncol(Y.tmp)),sep = "_")
+            Y.tmp = data.frame(Y = matrix(unlist(Y[1:(stage-1)]), nrow = nrow(X.tr), byrow = FALSE)); colnames(Y.tmp) <- paste("y", seq(ncol(Y.tmp)),sep = "_")
             X.tr = cbind(X.tr, Y.tmp)
           }
         }
