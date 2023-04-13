@@ -10,7 +10,6 @@ recommendDTR.cont.multi(
   X.new,
   A.new = NULL,
   Y.new = NULL,
-  A.feasible = NULL,
   A.cnstr.func = NULL,
   n.grid = 100,
   parallel = FALSE,
@@ -33,12 +32,6 @@ with algorithm results. Only needed when \code{all.inclusive = TRUE}.
 Default is \code{NULL}.}
 
 \item{Y.new}{A list. Required if \code{include.Y > 0} in \code{\link[=learnDTR.cont.multi]{learnDTR.cont.multi()}}. Default is \code{NULL}}
-
-\item{A.feasible}{Optional list, default is \code{NULL}. This allow user to specify the subject level's feasible action/treatment
-space. The length of list should be equal to the number of stages, and each element should be
-an N x 2 of matrix, where N represents the number of subjects and each row is the range of
-feasible action/treatment, i.e., (min, max). If \code{A.cnstr.func} is specified in \code{\link[=learnDTR.cont.multi]{learnDTR.cont.multi()}},
-then feasible set will also be made to satisfy that.}
 
 \item{A.cnstr.func}{Same as in \code{\link[=learnDTR.cont.multi]{learnDTR.cont.multi()}}. Provide a chance for it to be override, not very common though.
 If not specified, it will be inherited directly from the returns of \code{\link[=learnDTR.cont.multi]{learnDTR.cont.multi()}}.}

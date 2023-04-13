@@ -112,7 +112,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
       X.new = list(X.new)
     }
     if (is.null(A.feasible)) {
-      rep(list(NULL), length(X.new))
+      A.feasible = rep(list(NULL), length(X.new))
     } else {
       if (class(A.feasible)[1] != "list") {
         A.feasible = list(A.feasible)

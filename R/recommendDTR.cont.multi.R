@@ -12,11 +12,6 @@
 #'              with algorithm results. Only needed when \code{all.inclusive = TRUE}.
 #'              Default is \code{NULL}.
 #' @param Y.new A list. Required if \code{include.Y > 0} in [learnDTR.cont.multi()]. Default is \code{NULL}
-#' @param A.feasible Optional list, default is \code{NULL}. This allow user to specify the subject level's feasible action/treatment
-#'                   space. The length of list should be equal to the number of stages, and each element should be
-#'                   an N x 2 of matrix, where N represents the number of subjects and each row is the range of
-#'                   feasible action/treatment, i.e., (min, max). If \code{A.cnstr.func} is specified in [learnDTR.cont.multi()],
-#'                   then feasible set will also be made to satisfy that.
 #' @param A.cnstr.func Same as in [learnDTR.cont.multi()]. Provide a chance for it to be override, not very common though.
 #'                     If not specified, it will be inherited directly from the returns of [learnDTR.cont.multi()].
 #' @param n.grid Same as in [learnDTR.cont.multi()]. If not specified, it will be inherited from [learnDTR.cont.multi()].
@@ -67,7 +62,6 @@
 
 recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
                               X.new, A.new = NULL, Y.new = NULL,
-                              A.feasible = NULL,
                               A.cnstr.func = NULL,
                               n.grid = 100, parallel = FALSE, verbose = NULL) {
   n.stage <- DTRs$controls$n.stage
@@ -129,13 +123,7 @@ recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
     if (class(X.new)[1] != "list") {
       X.new = list(X.new)
     }
-    if (is.null(A.feasible)) {
-      rep(list(NULL), length(X.new))
-    } else {
-      if (class(A.feasible)[1] != "list") {
-        A.feasible = list(A.feasible)
-      }
-    }
+
     A.obs  <- list(ifelse(is.null(A.new), NA, A.new))
     A.ind  <- !is.na(A.obs)[-1]
     A.opt.S <- A.opt.T <- A.opt.deC <- list() # main output
@@ -153,11 +141,7 @@ recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
     } else {
       Y.new = c(currentDTRs$controls$Y.new, list(Y.new))
     }
-    if (class(A.feasible)[1] == "list") {
-      A.feasible = c(currentDTRs$controls$A.feasible, A.feasible)
-    } else {
-      A.feasible = c(currentDTRs$controls$A.feasible, list(A.feasible))
-    }
+
     A.opt.S <- currentDTRs$A.opt.S
     A.opt.T <- currentDTRs$A.opt.T
     A.opt.deC <- currentDTRs$A.opt.deC
@@ -222,11 +206,7 @@ recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
         if (baseLearner == "BART") {
           if (parallel == FALSE) {
             A.pred = my.sapply(1:nrow(X.te), function(i) {
-              if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
-              } else {
-                A.ff = A.range
-              }
+              A.ff = A.range
 
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
@@ -247,11 +227,8 @@ recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
             })
           } else {
             A.pred = foreach(i=1:nrow(X.te), .packages=c("dbarts"), .combine = f(nrow(X.te))) %dopar% {
-              if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
-              } else {
-                A.ff = A.range
-              }
+              A.ff = A.range
+
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
                   A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
@@ -272,14 +249,12 @@ recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
           }
         }
 
+
         if (baseLearner == "XGBoost") {
           if (parallel == FALSE) {
             A.pred = my.sapply(1:nrow(X.te), function(i) {
-              if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
-              } else {
-                A.ff = A.range
-              }
+              A.ff = A.range
+
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
                   A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
@@ -287,6 +262,7 @@ recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
                   A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,x.select])), ])
                 }
               }
+
               dat.tmp = NULL
               for (p in 1:ncol(A.range)) {
                 dat.tmp = cbind(dat.tmp,
@@ -298,11 +274,8 @@ recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
             })
           } else {
             A.pred = foreach(i=1:nrow(X.te), .packages=c("xgboost"), .combine = f(nrow(X.te))) %dopar% {
-              if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
-              } else {
-                A.ff = A.range
-              }
+              A.ff = A.range
+
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
                   A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
@@ -326,11 +299,8 @@ recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
         if (baseLearner == "RF") {
           if (parallel == FALSE) {
             A.pred = my.sapply(1:nrow(X.te), function(i) {
-              if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
-              } else {
-                A.ff = A.range
-              }
+              A.ff = A.range
+
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
                   A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
@@ -350,11 +320,8 @@ recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
             })
           } else {
             A.pred = foreach(i=1:nrow(X.te), .packages=c("ranger"), .combine = f(nrow(X.te))) %dopar% {
-              if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
-              } else {
-                A.ff = A.range
-              }
+              A.ff = A.range
+
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
                   A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
@@ -379,11 +346,8 @@ recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
         if (baseLearner == "GAM") {
           if (parallel == FALSE) {
             A.pred = my.sapply(1:nrow(X.te), function(i) {
-              if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
-              } else {
-                A.ff = A.range
-              }
+              A.ff = A.range
+
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
                   A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
@@ -404,11 +368,8 @@ recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
             })
           } else {
             A.pred = foreach(i=1:nrow(X.te), .packages=c("glmnet"), .combine = f(nrow(X.te))) %dopar% {
-              if (!is.null(A.feasible[[stage]])) {
-                A.ff = A.range[A.range <= max(A.feasible[[stage]][i,2]) & A.range >= min(A.feasible[[stage]][i,1]), ]
-              } else {
-                A.ff = A.range
-              }
+              A.ff = A.range
+
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
                   A.ff = suppressWarnings(A.ff[A.cnstr.func(A.ff, as.matrix(X.new[[stage]][i,])), ])
@@ -455,7 +416,6 @@ recommendDTR.cont.multi <- function(DTRs, currentDTRs = NULL,
                  controls = list(
                    X.new = X.new,
                    A.obs = A.obs,
-                   A.feasible = A.feasible,
                    Y.new = Y.new,
                    n.stage = n.stage,
                    A.list  = A.list,

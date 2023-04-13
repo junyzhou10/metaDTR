@@ -255,9 +255,9 @@ learnDTR.cont.multi <- function(X, A, Y,
                 # find proper A.range if there is any constraint on A given X/Y
                 if (is.function(A.cnstr.func)) {
                   if (is.null(x.select)) {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i,] ), ])
                   } else {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i, x.select] ), ])
                   }
                 } else {
                   A.range = A.feasible
@@ -287,9 +287,9 @@ learnDTR.cont.multi <- function(X, A, Y,
                 # find proper A.range if there is any constraint on A given X/Y
                 if (is.function(A.cnstr.func)) {
                   if (is.null(x.select)) {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i,] ), ])
                   } else {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i, x.select] ), ])
                   }
                 } else {
                   A.range = A.feasible
@@ -333,9 +333,9 @@ learnDTR.cont.multi <- function(X, A, Y,
                 # find proper A.range if there is any constraint on A given X/Y
                 if (is.function(A.cnstr.func)) {
                   if (is.null(x.select)) {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i,] ), ])
                   } else {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i, x.select] ), ])
                   }
                 } else {
                   A.range = A.feasible
@@ -365,9 +365,9 @@ learnDTR.cont.multi <- function(X, A, Y,
                 # find proper A.range if there is any constraint on A given X/Y
                 if (is.function(A.cnstr.func)) {
                   if (is.null(x.select)) {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i,] ), ])
                   } else {
-                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
+                    A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i, x.select] ), ])
                   }
                 } else {
                   A.range = A.feasible
@@ -469,9 +469,9 @@ learnDTR.cont.multi <- function(X, A, Y,
               # find proper A.range if there is any constraint on A given X/Y
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i,] ), ])
                 } else {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i, x.select] ), ])
                 }
               } else {
                 A.range = A.feasible
@@ -501,9 +501,9 @@ learnDTR.cont.multi <- function(X, A, Y,
               # find proper A.range if there is any constraint on A given X/Y
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i,] ), ])
                 } else {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i, x.select] ), ])
                 }
               } else {
                 A.range = A.feasible
@@ -610,9 +610,9 @@ learnDTR.cont.multi <- function(X, A, Y,
               # find proper A.range if there is any constraint on A given X/Y
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i,] ), ])
                 } else {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i, x.select] ), ])
                 }
               } else {
                 A.range = A.feasible
@@ -642,9 +642,9 @@ learnDTR.cont.multi <- function(X, A, Y,
               # find proper A.range if there is any constraint on A given X/Y
               if (is.function(A.cnstr.func)) {
                 if (is.null(x.select)) {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i,]) ), ])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i,] ), ])
                 } else {
-                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]][i, x.select]) ), ])
+                  A.range = suppressWarnings(A.feasible[A.cnstr.func(A.feasible, as.matrix(X[[stage]])[i, x.select] ), ])
                 }
               } else {
                 A.range = A.feasible
