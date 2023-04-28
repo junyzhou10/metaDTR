@@ -13,6 +13,7 @@ recommendDTR.cont.multi(
   A.cnstr.func = NULL,
   n.grid = 100,
   parallel = FALSE,
+  parallel.package = NULL,
   verbose = NULL
 )
 }
@@ -40,6 +41,8 @@ If not specified, it will be inherited directly from the returns of \code{\link[
 
 \item{parallel}{A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
 number of cores to use. Otherwise, directly use the number from \code{\link[=learnDTR.cont.multi]{learnDTR.cont.multi()}}}
+
+\item{parallel.package}{One of c("doMC", "snow", "doParallel"), the parallel package to use.}
 
 \item{verbose}{Console output allowed? Default is \code{NULL}, which will inherit the argument input of}
 }
@@ -79,7 +82,7 @@ DTRs = learnDTR.cont.multi(X = tmp$X,
                           include.Y = 0,
                           A.box.cnstr = cbind(c(-2,2), c(-2,2)),
                           A.cnstr.func = function(a, x) {
-                            abs(a[,1]+x[,1]) + abs(a[,2]+x[,2]) <= 3
+                            abs(a[,1]+x[1]) + abs(a[,2]+x[2]) <= 3
                           },
                           x.select = c("V1", "V2"),
                           n.grid = 50,

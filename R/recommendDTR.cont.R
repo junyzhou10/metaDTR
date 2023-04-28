@@ -22,6 +22,7 @@
 #' @param n.grid Same as in [learnDTR.cont()]. If not specified, it will be inherited from [learnDTR.cont()].
 #' @param parallel A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
 #'                 number of cores to use. Otherwise, directly use the number from [learnDTR.cont()]
+#' @param parallel.package One of c("doMC", "snow", "doParallel"), the parallel package to use.
 #' @param verbose Console output allowed? Default is \code{NULL}, which will inherit the argument input of
 #' @details This function make recommendations based on the trained learners from [learnDTR.cont()] for new dataset.
 #'          Since in real application, later stage covariates/outcomes are unobservable until treatments are
@@ -44,7 +45,7 @@
 #'                      include.Y = 0)
 #' optDTR <- recommendDTR.cont(DTRs, currentDTRs = NULL,
 #'                             X.new = ThreeStg_Dat$X.test)
-#' @import dbarts glmnet ranger xgboost pbapply doParallel snow utils foreach
+#' @import dbarts glmnet ranger xgboost pbapply doParallel snow utils foreach doMC
 #' @export
 #' @seealso \code{\link{learnDTR.cont}}
 
@@ -52,7 +53,9 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
                               X.new, A.new = NULL, Y.new = NULL,
                               A.feasible = NULL,
                               A.cnstr.func = NULL,
-                              n.grid = 100, parallel = FALSE, verbose = NULL) {
+                              n.grid = 100,
+                              parallel = FALSE, parallel.package = NULL,
+                              verbose = NULL) {
   n.stage <- DTRs$controls$n.stage
   baseLearner <- DTRs$controls$baseLearner
   metaLearners <- DTRs$controls$metaLearners
@@ -62,6 +65,9 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
   include.A <- DTRs$controls$include.A
   if (is.null(A.cnstr.func)) {
     A.cnstr.func <- DTRs$controls$A.cnstr.func
+  }
+  if (is.null(parallel.package)) {
+    parallel.package <- DTRs$controls$parallel.package
   }
 
   x.select <- DTRs$controls$x.select
@@ -97,12 +103,28 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
 
     if (is.numeric(parallel)) {
       # Start a cluster
-      cl <- makeCluster(parallel, type='SOCK')
-      registerDoParallel(cl)
+      if (parallel.package[1] == "doMC"){
+        doMC::registerDoMC(parallel)
+      }
+      if (parallel.package[1] == "doParallel") {
+        doParallel::registerDoParallel(parallel)
+      }
+      if (parallel.package[1] == "snow") {
+        cl <- makeCluster(parallel, type='SOCK')
+        registerDoParallel(cl)
+      }
     } else {
       # Start a cluster
-      cl <- makeCluster(detectCores(), type='SOCK')
-      registerDoParallel(cl)
+      if (parallel.package[1] == "doMC"){
+        doMC::registerDoMC(detectCores())
+      }
+      if (parallel.package[1] == "doParallel") {
+        doParallel::registerDoParallel(detectCores())
+      }
+      if (parallel.package[1] == "snow") {
+        cl <- makeCluster(detectCores(), type='SOCK')
+        registerDoParallel(cl)
+      }
     }
   }
 
@@ -385,7 +407,7 @@ recommendDTR.cont <- function(DTRs, currentDTRs = NULL,
 
   if (!parallel == FALSE) {
     #Stop the cluster
-    stopCluster(cl)
+    if (parallel.package[1] == "snow") {stopCluster(cl)}
   }
   ######========== Prepare outputs
   OptDTR <- list(A.opt.S = A.opt.S,

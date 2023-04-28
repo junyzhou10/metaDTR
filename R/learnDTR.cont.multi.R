@@ -36,6 +36,10 @@
 #'                 It might induce certain connection issue with \code{glmnet}. But parallel is not really
 #'                 necessary. It does not impact training speed. Also, if a numeric value, it implies the
 #'                 number of cores to use. Otherwise, directly use the number from `detectCores()`.
+#' @param parallel.package One of c("doMC", "snow", "doParallel"), the parallel package to use. Only \code{BART}
+#'                         seems matches better with \code{snow}, while the others, like \code{XGBoost},
+#'                         \code{RF}, and \code{GAM} prefers \code{doMC}. So please check which parallel structure
+#'                         fits the best on the chosen algorithm before running heavy duty.
 #' @param A.box.cnstr Box constraint for A. Default is \code{NULL}, which means no constraint on A
 #'                    and the feasible set of A will be implied from observed action values. If there are
 #'                    k treatment/action, element should be a 2xk matrix
@@ -49,6 +53,7 @@
 #'                 selected (if X is used in function \code{A.cnstr.func}) or X is not related to A's feasible set
 #' @param n.grid Number of grid used to search for the best treatment/action. Large values slow down the algorithm.
 #' @param verbose Console print allowed?
+#' @param verbose.parallel Verbose specifically for parallel computing. May slow down the computation
 #' @param ... Additional arguments that can be passed to \code{dbarts::bart}, \code{ranger::ranger},
 #'            \code{params} of \code{xbgoost::xgb.cv}, or \code{glmnet::cv.glmnet}
 #' @details This function supports to find the optimal dynamic treatment regime (DTR) for either randomized experiments
@@ -86,7 +91,7 @@
 #'                           include.Y = 0,
 #'                           A.box.cnstr = cbind(c(-2,2), c(-2,2)),
 #'                           A.cnstr.func = function(a, x) {
-#'                             abs(a[,1]+x[,1]) + abs(a[,2]+x[,2]) <= 3
+#'                             abs(a[,1]+x[1]) + abs(a[,2]+x[2]) <= 3
 #'                           },
 #'                           x.select = c("V1", "V2"),
 #'                           n.grid = 50,
@@ -109,11 +114,14 @@ learnDTR.cont.multi <- function(X, A, Y,
                                 metaLearners = c("S"),
                                 include.X = 0, include.A = 0, include.Y = 0,
                                 parallel = FALSE,
+                                parallel.package = "doMC",
                                 A.box.cnstr = NULL,
                                 A.cnstr.func = NULL,
                                 x.select = NULL,
                                 n.grid = 100,
-                                verbose = TRUE, ...
+                                verbose = TRUE,
+                                verbose.parallel = FALSE,
+                                ...
 ) {
   n.stage = length(X)
   Store.NAME = list()
@@ -147,18 +155,21 @@ learnDTR.cont.multi <- function(X, A, Y,
   if (parallel == FALSE) {
 
   } else {
-    # Progress combine function
-    f <- function(iterator){
-      pb <- txtProgressBar(min = 1, max = iterator - 1, style = 3)
-      count <- 0
-      function(...) {
-        count <<- count + length(list(...)) - 1
-        setTxtProgressBar(pb, count)
-        flush.console()
-        cbind(...) # this can feed into .combine option of foreach
+    if (verbose.parallel) {
+      # Progress combine function
+      f <- function(iterator){
+        pb <- txtProgressBar(min = 1, max = iterator - 1, style = 3)
+        count <- 0
+        function(...) {
+          count <<- count + length(list(...)) - 1
+          setTxtProgressBar(pb, count)
+          flush.console()
+          cbind(...) # this can feed into .combine option of foreach
+        }
       }
+    } else {
+      f <- function(x){function(...) cbind(...)}
     }
-
   }
 
 
@@ -229,8 +240,7 @@ learnDTR.cont.multi <- function(X, A, Y,
         A.tr = as.matrix(A[[stage]])
         Y.tr = as.matrix(Y[[stage]])
         A.feasible = do.call(expand.grid,
-                             apply(A.tr, 2, function(x) seq(min(x), max(x), length.out = n.grid), simplify = FALSE)
-        )
+                             lapply(seq(ncol(A.tr)), function(x) seq(min(A.tr[,x]), max(A.tr[,x]), length.out = n.grid)))
         V.est = V.est + colSums(weights.Y * t(Y.tr))*weights[stage]
         ## construct training dataset with interactions
         dat.tmp = NULL
@@ -275,13 +285,30 @@ learnDTR.cont.multi <- function(X, A, Y,
               ## register cores
               if (is.numeric(parallel)) {
                 # Start a cluster
-                cl <- makeCluster(parallel, type='SOCK')
-                registerDoParallel(cl)
+                if (parallel.package[1] == "doMC"){
+                  doMC::registerDoMC(parallel)
+                }
+                if (parallel.package[1] == "doParallel") {
+                  doParallel::registerDoParallel(parallel)
+                }
+                if (parallel.package[1] == "snow") {
+                  cl <- makeCluster(parallel, type='SOCK')
+                  registerDoParallel(cl)
+                }
               } else {
                 # Start a cluster
-                cl <- makeCluster(detectCores(), type='SOCK')
-                registerDoParallel(cl)
+                if (parallel.package[1] == "doMC"){
+                  doMC::registerDoMC(detectCores())
+                }
+                if (parallel.package[1] == "doParallel") {
+                  doParallel::registerDoParallel(detectCores())
+                }
+                if (parallel.package[1] == "snow") {
+                  cl <- makeCluster(detectCores(), type='SOCK')
+                  registerDoParallel(cl)
+                }
               }
+
 
               S.est = foreach(i=1:nrow(X.tr), .packages=c("dbarts"), .combine = f(nrow(X.tr))) %dopar% {
                 # find proper A.range if there is any constraint on A given X/Y
@@ -305,7 +332,7 @@ learnDTR.cont.multi <- function(X, A, Y,
               } # should be n.grid x nrow(X.tr)
 
               ## Stop the cluster
-              stopCluster(cl)
+              if (parallel.package[1] == "snow") {stopCluster(cl)}
             }
           }
         }
@@ -353,13 +380,30 @@ learnDTR.cont.multi <- function(X, A, Y,
               ## register cores
               if (is.numeric(parallel)) {
                 # Start a cluster
-                cl <- makeCluster(parallel, type='SOCK')
-                registerDoParallel(cl)
+                if (parallel.package[1] == "doMC"){
+                  doMC::registerDoMC(parallel)
+                }
+                if (parallel.package[1] == "doParallel") {
+                  doParallel::registerDoParallel(parallel)
+                }
+                if (parallel.package[1] == "snow") {
+                  cl <- makeCluster(parallel, type='SOCK')
+                  registerDoParallel(cl)
+                }
               } else {
                 # Start a cluster
-                cl <- makeCluster(detectCores(), type='SOCK')
-                registerDoParallel(cl)
+                if (parallel.package[1] == "doMC"){
+                  doMC::registerDoMC(detectCores())
+                }
+                if (parallel.package[1] == "doParallel") {
+                  doParallel::registerDoParallel(detectCores())
+                }
+                if (parallel.package[1] == "snow") {
+                  cl <- makeCluster(detectCores(), type='SOCK')
+                  registerDoParallel(cl)
+                }
               }
+
 
               S.est = foreach(i=1:nrow(X.tr), .packages=c("xgboost"), .combine = f(nrow(X.tr))) %dopar% {
                 # find proper A.range if there is any constraint on A given X/Y
@@ -383,7 +427,7 @@ learnDTR.cont.multi <- function(X, A, Y,
               } # should be n.grid x nrow(X.tr)
 
               #Stop the cluster
-              stopCluster(cl)
+              if (parallel.package[1] == "snow") {stopCluster(cl)}
             }
           }
         }
@@ -447,8 +491,7 @@ learnDTR.cont.multi <- function(X, A, Y,
         A.tr = as.matrix(A[[stage]])
         Y.tr = as.matrix(Y[[stage]])
         A.feasible = do.call(expand.grid,
-                             apply(A.tr, 2, function(x) seq(min(x), max(x), length.out = n.grid), simplify = FALSE)
-        )
+                             lapply(seq(ncol(A.tr)), function(x) seq(min(A.tr[,x]), max(A.tr[,x]), length.out = n.grid)))
         V.est = V.est + colSums(weights.Y * t(Y.tr))*weights[stage]
         ## construct training dataset with interactions
         dat.tmp = NULL
@@ -489,12 +532,28 @@ learnDTR.cont.multi <- function(X, A, Y,
             ## register cores
             if (is.numeric(parallel)) {
               # Start a cluster
-              cl <- makeCluster(parallel, type='SOCK')
-              registerDoParallel(cl)
+              if (parallel.package[1] == "doMC"){
+                doMC::registerDoMC(parallel)
+              }
+              if (parallel.package[1] == "doParallel") {
+                doParallel::registerDoParallel(parallel)
+              }
+              if (parallel.package[1] == "snow") {
+                cl <- makeCluster(parallel, type='SOCK')
+                registerDoParallel(cl)
+              }
             } else {
               # Start a cluster
-              cl <- makeCluster(detectCores(), type='SOCK')
-              registerDoParallel(cl)
+              if (parallel.package[1] == "doMC"){
+                doMC::registerDoMC(detectCores())
+              }
+              if (parallel.package[1] == "doParallel") {
+                doParallel::registerDoParallel(detectCores())
+              }
+              if (parallel.package[1] == "snow") {
+                cl <- makeCluster(detectCores(), type='SOCK')
+                registerDoParallel(cl)
+              }
             }
 
             S.est = foreach(i=1:nrow(X.tr), .packages=c("ranger"), .combine = f(nrow(X.tr))) %dopar% {
@@ -518,7 +577,7 @@ learnDTR.cont.multi <- function(X, A, Y,
             } # should be n.grid x nrow(X.tr)
 
             #Stop the cluster
-            stopCluster(cl)
+            if (parallel.package[1] == "snow") {stopCluster(cl)}
           }
         }
 
@@ -583,8 +642,7 @@ learnDTR.cont.multi <- function(X, A, Y,
         A.tr = as.matrix(A[[stage]])
         Y.tr = as.matrix(Y[[stage]])
         A.feasible = do.call(expand.grid,
-                             apply(A.tr, 2, function(x) seq(min(x), max(x), length.out = n.grid), simplify = FALSE)
-        )
+                             lapply(seq(ncol(A.tr)), function(x) seq(min(A.tr[,x]), max(A.tr[,x]), length.out = n.grid)))
         V.est = V.est + colSums(weights.Y * t(Y.tr))*weights[stage]
         ## construct training dataset with interactions
         dat.tmp = NULL
@@ -630,12 +688,28 @@ learnDTR.cont.multi <- function(X, A, Y,
             ## register cores
             if (is.numeric(parallel)) {
               # Start a cluster
-              cl <- makeCluster(parallel, type='SOCK')
-              registerDoParallel(cl)
+              if (parallel.package[1] == "doMC"){
+                doMC::registerDoMC(parallel)
+              }
+              if (parallel.package[1] == "doParallel") {
+                doParallel::registerDoParallel(parallel)
+              }
+              if (parallel.package[1] == "snow") {
+                cl <- makeCluster(parallel, type='SOCK')
+                registerDoParallel(cl)
+              }
             } else {
               # Start a cluster
-              cl <- makeCluster(detectCores(), type='SOCK')
-              registerDoParallel(cl)
+              if (parallel.package[1] == "doMC"){
+                doMC::registerDoMC(detectCores())
+              }
+              if (parallel.package[1] == "doParallel") {
+                doParallel::registerDoParallel(detectCores())
+              }
+              if (parallel.package[1] == "snow") {
+                cl <- makeCluster(detectCores(), type='SOCK')
+                registerDoParallel(cl)
+              }
             }
 
             S.est = foreach(i=1:nrow(X.tr), .packages=c("glmnet"), .combine = f(nrow(X.tr))) %dopar% {
@@ -659,7 +733,7 @@ learnDTR.cont.multi <- function(X, A, Y,
             } # should be n.grid x nrow(X.tr)
 
             #Stop the cluster
-            stopCluster(cl)
+            if (parallel.package[1] == "snow") {stopCluster(cl)}
           }
         }
 
@@ -691,7 +765,8 @@ learnDTR.cont.multi <- function(X, A, Y,
                    x.select = x.select,
                    n.grid = n.grid,
                    store.names = Store.NAME,
-                   verbose = verbose
+                   verbose = verbose,
+                   parallel.package = parallel.package
                  )
   )
 

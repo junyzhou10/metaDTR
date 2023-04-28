@@ -16,11 +16,13 @@ learnDTR.cont.multi(
   include.A = 0,
   include.Y = 0,
   parallel = FALSE,
+  parallel.package = "doMC",
   A.box.cnstr = NULL,
   A.cnstr.func = NULL,
   x.select = NULL,
   n.grid = 100,
   verbose = TRUE,
+  verbose.parallel = FALSE,
   ...
 )
 }
@@ -69,6 +71,11 @@ It might induce certain connection issue with \code{glmnet}. But parallel is not
 necessary. It does not impact training speed. Also, if a numeric value, it implies the
 number of cores to use. Otherwise, directly use the number from \code{detectCores()}.}
 
+\item{parallel.package}{One of c("doMC", "snow", "doParallel"), the parallel package to use. Only \code{BART}
+seems matches better with \code{snow}, while the others, like \code{XGBoost},
+\code{RF}, and \code{GAM} prefers \code{doMC}. So please check which parallel structure
+fits the best on the chosen algorithm before running heavy duty.}
+
 \item{A.box.cnstr}{Box constraint for A. Default is \code{NULL}, which means no constraint on A
 and the feasible set of A will be implied from observed action values. If there are
 k treatment/action, element should be a 2xk matrix}
@@ -86,6 +93,8 @@ selected (if X is used in function \code{A.cnstr.func}) or X is not related to A
 \item{n.grid}{Number of grid used to search for the best treatment/action. Large values slow down the algorithm.}
 
 \item{verbose}{Console print allowed?}
+
+\item{verbose.parallel}{Verbose specifically for parallel computing. May slow down the computation}
 
 \item{...}{Additional arguments that can be passed to \code{dbarts::bart}, \code{ranger::ranger},
 \code{params} of \code{xbgoost::xgb.cv}, or \code{glmnet::cv.glmnet}}
@@ -132,7 +141,7 @@ DTRs = learnDTR.cont.multi(X = tmp$X,
                           include.Y = 0,
                           A.box.cnstr = cbind(c(-2,2), c(-2,2)),
                           A.cnstr.func = function(a, x) {
-                            abs(a[,1]+x[,1]) + abs(a[,2]+x[,2]) <= 3
+                            abs(a[,1]+x[1]) + abs(a[,2]+x[2]) <= 3
                           },
                           x.select = c("V1", "V2"),
                           n.grid = 50,

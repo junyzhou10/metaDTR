@@ -14,6 +14,7 @@ recommendDTR.cont(
   A.cnstr.func = NULL,
   n.grid = 100,
   parallel = FALSE,
+  parallel.package = NULL,
   verbose = NULL
 )
 }
@@ -47,6 +48,8 @@ If not specified, it will be inherited directly from the returns of \code{\link[
 
 \item{parallel}{A boolean, for whether parallel computing is adopted. Also, if a numeric value, it implies the
 number of cores to use. Otherwise, directly use the number from \code{\link[=learnDTR.cont]{learnDTR.cont()}}}
+
+\item{parallel.package}{One of c("doMC", "snow", "doParallel"), the parallel package to use.}
 
 \item{verbose}{Console output allowed? Default is \code{NULL}, which will inherit the argument input of}
 }
